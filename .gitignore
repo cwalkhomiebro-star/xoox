@@ -1,0 +1,22 @@
+# Environment variables — NEVER commit this
+.env
+
+# Database — persists locally, Render uses its own
+bot_database.db
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp

@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: telegram-sales-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: ADMIN_ID
+        sync: false
+      - key: CHANNEL_ID
+        sync: false
+      - key: USDT_TRC20_WALLET
+        sync: false
+      - key: SUPPORT_USERNAME
+        sync: false
+      - key: BOT_USERNAME
+        sync: false
