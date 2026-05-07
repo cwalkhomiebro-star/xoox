@@ -1,21 +1,44 @@
 from services.database import get_db_connection
 
-def register_user(user_id, username, full_name, referred_by=None):
-    """Registers a new user in the database or updates existing user info."""
+
+# ── User Registration & Updates ────────────────────────────────────────────────
+
+def register_user(user_id, username, full_name, referred_by=None, language_code=None):
+    """Registers a new user or updates their username/full_name on re-start."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    
+
     cursor.execute('''
-        INSERT OR IGNORE INTO users (user_id, username, full_name, referred_by)
-        VALUES (?, ?, ?, ?)
-    ''', (user_id, username, full_name, referred_by))
-    
+        INSERT OR IGNORE INTO users (user_id, username, full_name, referred_by, language)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (user_id, username, full_name, referred_by, language_code))
+
+    is_new_user = cursor.rowcount > 0  # True only if a row was actually inserted
+
+    # Update username/full_name in case they changed. Only set language if not already set.
+    cursor.execute('''
+        UPDATE users SET username = ?, full_name = ?, last_seen = CURRENT_TIMESTAMP,
+                         language = COALESCE(language, ?)
+        WHERE user_id = ?
+    ''', (username, full_name, language_code, user_id))
+
     conn.commit()
     conn.close()
 
-    # If this is a new user (INSERT happened) and there's a referrer, credit them
-    if referred_by and referred_by != user_id:
+    # Credit referrer ONLY if this is a brand-new user registration
+    if is_new_user and referred_by and referred_by != user_id:
         _increment_referral_count(referred_by)
+
+def update_last_seen(user_id):
+    """Updates the last_seen timestamp for a user."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE users SET last_seen = CURRENT_TIMESTAMP WHERE user_id = ?",
+        (user_id,)
+    )
+    conn.commit()
+    conn.close()
 
 def _increment_referral_count(referrer_id):
     """Increments the referral count for a given user."""
@@ -32,79 +55,124 @@ def update_selected_plan(user_id, plan_id):
     """Updates the user's selected plan in the database."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    
     cursor.execute('''
         UPDATE users
         SET selected_plan = ?, payment_status = 'pending'
         WHERE user_id = ?
     ''', (plan_id, user_id))
-    
     conn.commit()
     conn.close()
 
-def get_user_status(user_id):
-    """Fetches the current status and selected plan for a user."""
+def update_user_language(user_id: int, language: str):
+    """Updates the user's preferred language."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    
     cursor.execute(
-        'SELECT selected_plan, payment_status, is_approved, join_date, referral_count FROM users WHERE user_id = ?',
+        "UPDATE users SET language = ? WHERE user_id = ?",
+        (language, user_id)
+    )
+    conn.commit()
+    conn.close()
+
+def get_user_language(user_id: int) -> str:
+    """Gets the user's preferred language, defaulting to 'en'."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    row = cursor.execute("SELECT language FROM users WHERE user_id = ?", (user_id,)).fetchone()
+    conn.close()
+    if row and row['language']:
+        return row['language']
+    return 'en'
+
+
+# ── Interaction Logging ────────────────────────────────────────────────────────
+
+def log_interaction(user_id, action, detail=None):
+    """
+    Logs a single user interaction to the interactions table.
+    action: short string key e.g. 'start', 'view_pricing', 'view_demo'
+    detail: optional extra context e.g. 'demo_1', 'pro'
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO interactions (user_id, action, detail) VALUES (?, ?, ?)",
+        (user_id, action, detail)
+    )
+    conn.commit()
+    conn.close()
+
+
+# ── Read Queries ───────────────────────────────────────────────────────────────
+
+def get_user_status(user_id):
+    """Fetches the full status record for a user."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        '''SELECT user_id, username, full_name, selected_plan, payment_status,
+                  payment_method, is_approved, join_date, last_seen, referral_count
+           FROM users WHERE user_id = ?''',
         (user_id,)
     )
     row = cursor.fetchone()
-    
     conn.close()
     return dict(row) if row else None
 
-def approve_user_payment(user_id):
-    """Marks a user's payment as approved and updates status."""
+def get_all_users(limit=50, offset=0):
+    """Returns all registered users ordered by join date descending."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    
-    cursor.execute('''
-        UPDATE users
-        SET payment_status = 'approved', is_approved = 1
-        WHERE user_id = ?
-    ''', (user_id,))
-    
-    conn.commit()
+    cursor.execute(
+        '''SELECT user_id, username, full_name, payment_status, is_approved,
+                  join_date, last_seen, selected_plan
+           FROM users
+           ORDER BY join_date DESC
+           LIMIT ? OFFSET ?''',
+        (limit, offset)
+    )
+    rows = cursor.fetchall()
+    total = cursor.execute("SELECT COUNT(*) FROM users").fetchone()[0]
     conn.close()
+    return [dict(r) for r in rows], total
+
+def lookup_user_by_username(username: str):
+    """Finds a user by their Telegram username (without @)."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        '''SELECT user_id, username, full_name, selected_plan, payment_status,
+                  is_approved, join_date, last_seen, referral_count
+           FROM users WHERE LOWER(username) = LOWER(?)
+           LIMIT 1''',
+        (username.lstrip('@'),)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
 
 def get_pending_payments():
     """Returns a list of all users with pending payments."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    
-    cursor.execute('SELECT user_id, username, selected_plan FROM users WHERE payment_status = "pending"')
+    cursor.execute(
+        'SELECT user_id, username, selected_plan FROM users WHERE payment_status = "pending"'
+    )
     rows = cursor.fetchall()
-    
     conn.close()
     return [dict(row) for row in rows]
 
-def get_stats():
-    """Returns overall bot statistics for the admin dashboard."""
+def get_users_by_status(status):
+    """Returns users matching the given payment_status."""
     conn = get_db_connection()
     cursor = conn.cursor()
-
-    stats = {}
-    stats['total_users'] = cursor.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    stats['approved_users'] = cursor.execute("SELECT COUNT(*) FROM users WHERE is_approved = 1").fetchone()[0]
-    stats['pending_users'] = cursor.execute("SELECT COUNT(*) FROM users WHERE payment_status = 'pending'").fetchone()[0]
-
-    # Plan breakdown
-    rows = cursor.execute(
-        "SELECT selected_plan, COUNT(*) as cnt FROM users WHERE is_approved = 1 GROUP BY selected_plan"
-    ).fetchall()
-    stats['plan_breakdown'] = {row[0]: row[1] for row in rows if row[0]}
-
-    # Top referrers
-    rows = cursor.execute(
-        "SELECT user_id, username, referral_count FROM users WHERE referral_count > 0 ORDER BY referral_count DESC LIMIT 5"
-    ).fetchall()
-    stats['top_referrers'] = [dict(row) for row in rows]
-
+    cursor.execute(
+        "SELECT user_id, username, full_name, selected_plan, join_date FROM users WHERE payment_status = ?",
+        (status,)
+    )
+    rows = cursor.fetchall()
     conn.close()
-    return stats
+    return [dict(row) for row in rows]
 
 def get_status_counts():
     """Returns a dict with counts for pending, approved, and cancelled users."""
@@ -118,17 +186,94 @@ def get_status_counts():
     conn.close()
     return counts
 
-def get_users_by_status(status):
-    """Returns a list of users matching the given payment_status."""
+
+# ── Stats & Analytics ──────────────────────────────────────────────────────────
+
+def get_stats():
+    """Returns overall bot statistics for the admin dashboard."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute(
-        "SELECT user_id, username, full_name, selected_plan, join_date FROM users WHERE payment_status = ?",
-        (status,)
-    )
-    rows = cursor.fetchall()
+
+    stats = {}
+    stats['total_users']    = cursor.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    stats['approved_users'] = cursor.execute("SELECT COUNT(*) FROM users WHERE is_approved = 1").fetchone()[0]
+    stats['pending_users']  = cursor.execute("SELECT COUNT(*) FROM users WHERE payment_status = 'pending'").fetchone()[0]
+
+    # New user counts
+    stats['new_today'] = cursor.execute(
+        "SELECT COUNT(*) FROM users WHERE DATE(join_date) = DATE('now')"
+    ).fetchone()[0]
+    stats['new_week'] = cursor.execute(
+        "SELECT COUNT(*) FROM users WHERE join_date >= DATETIME('now', '-7 days')"
+    ).fetchone()[0]
+
+    # Plan breakdown (approved only)
+    rows = cursor.execute(
+        "SELECT selected_plan, COUNT(*) as cnt FROM users WHERE is_approved = 1 GROUP BY selected_plan"
+    ).fetchall()
+    stats['plan_breakdown'] = {row[0]: row[1] for row in rows if row[0]}
+
+    # Top referrers
+    rows = cursor.execute(
+        "SELECT user_id, username, referral_count FROM users WHERE referral_count > 0 ORDER BY referral_count DESC LIMIT 5"
+    ).fetchall()
+    stats['top_referrers'] = [dict(row) for row in rows]
+
+    # Funnel from interactions
+    stats['viewed_pricing']  = cursor.execute(
+        "SELECT COUNT(DISTINCT user_id) FROM interactions WHERE action = 'view_pricing'"
+    ).fetchone()[0]
+    stats['clicked_plan']    = cursor.execute(
+        "SELECT COUNT(DISTINCT user_id) FROM interactions WHERE action = 'view_plan'"
+    ).fetchone()[0]
+    stats['submitted_payment'] = cursor.execute(
+        "SELECT COUNT(DISTINCT user_id) FROM interactions WHERE action = 'payment_submitted'"
+    ).fetchone()[0]
+
+    # Demo views per demo
+    demo_rows = cursor.execute(
+        "SELECT detail, COUNT(*) FROM interactions WHERE action = 'view_demo' GROUP BY detail"
+    ).fetchall()
+    stats['demo_views'] = {row[0]: row[1] for row in demo_rows}
+
+    conn.close()
+    return stats
+
+def get_interaction_stats():
+    """Returns aggregated interaction counts by action type."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    rows = cursor.execute(
+        "SELECT action, detail, COUNT(*) as cnt FROM interactions GROUP BY action, detail ORDER BY cnt DESC"
+    ).fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+
+# ── Payment Actions ────────────────────────────────────────────────────────────
+
+def approve_user_payment(user_id):
+    """
+    Marks a user's payment as approved.
+    Returns (newly_approved, referred_by)
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT is_approved, referred_by FROM users WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return False, None
+    was_approved = bool(row['is_approved'])
+    referred_by = row['referred_by']
+
+    cursor.execute(
+        "UPDATE users SET payment_status = 'approved', is_approved = 1 WHERE user_id = ?",
+        (user_id,)
+    )
+    conn.commit()
+    conn.close()
+    return not was_approved, referred_by
 
 def cancel_user_payment(user_id):
     """Marks a user's payment as cancelled."""
@@ -140,3 +285,127 @@ def cancel_user_payment(user_id):
     )
     conn.commit()
     conn.close()
+
+
+# ── Stars Payment Functions ────────────────────────────────────────────────────
+
+def has_active_purchase(user_id: int, plan_id: str) -> bool:
+    """Returns True if the user has already successfully purchased this plan."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT 1 FROM purchases WHERE user_id = ? AND plan_id = ? LIMIT 1",
+        (user_id, plan_id)
+    )
+    result = cursor.fetchone()
+    conn.close()
+    return result is not None
+
+def record_stars_purchase(user_id: int, plan_id: str, telegram_charge_id: str) -> tuple[bool, int]:
+    """
+    Records a completed Telegram Stars purchase in the purchases table
+    and marks the user as approved with payment_method = 'stars'.
+    The UNIQUE constraint on telegram_charge_id prevents double-delivery.
+    Returns (newly_approved, referred_by)
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT is_approved, referred_by FROM users WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return False, None
+    was_approved = bool(row['is_approved'])
+    referred_by = row['referred_by']
+
+    cursor.execute(
+        '''
+        INSERT OR IGNORE INTO purchases (user_id, plan_id, payment_method, telegram_charge_id)
+        VALUES (?, ?, 'stars', ?)
+        ''',
+        (user_id, plan_id, telegram_charge_id)
+    )
+    cursor.execute(
+        '''
+        UPDATE users
+        SET selected_plan = ?,
+            payment_status = 'approved',
+            payment_method = 'stars',
+            is_approved = 1
+        WHERE user_id = ?
+        ''',
+        (plan_id, user_id)
+    )
+    conn.commit()
+    conn.close()
+    return not was_approved, referred_by
+
+
+# ── Ban / Unban Functions ───────────────────────────────────────────────────────
+
+def ban_user(user_id: int, reason: str = None) -> None:
+    """Adds a user to the banned_users table."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT OR IGNORE INTO banned_users (user_id, reason) VALUES (?, ?)",
+        (user_id, reason)
+    )
+    conn.commit()
+    conn.close()
+
+def unban_user(user_id: int) -> None:
+    """Removes a user from the banned_users table."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM banned_users WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+
+def is_banned(user_id: int) -> bool:
+    """Returns True if the user is banned."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    result = cursor.execute(
+        "SELECT 1 FROM banned_users WHERE user_id = ? LIMIT 1", (user_id,)
+    ).fetchone()
+    conn.close()
+    return result is not None
+
+def get_banned_users() -> list:
+    """Returns all banned users."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    rows = cursor.execute(
+        "SELECT user_id, reason, banned_at FROM banned_users ORDER BY banned_at DESC"
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+# ── Rate Limiting ──────────────────────────────────────────────────────────────
+
+def check_rate_limit(user_id: int, min_interval: float = 1.5) -> bool:
+    """
+    Returns True if the user is allowed to proceed, False if they are rate limited.
+    Updates the last_action timestamp if allowed.
+    """
+    import time
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    now = time.time()
+    
+    cursor.execute("SELECT last_action FROM rate_limits WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    if row and (now - row[0]) < min_interval:
+        conn.close()
+        return False
+        
+    cursor.execute('''
+        INSERT INTO rate_limits (user_id, last_action)
+        VALUES (?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET last_action = excluded.last_action
+    ''', (user_id, now))
+    conn.commit()
+    conn.close()
+    return True

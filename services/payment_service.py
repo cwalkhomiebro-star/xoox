@@ -1,29 +1,18 @@
 from config import WALLET_ADDRESS, PRICING_PLANS
+from utils.i18n import get_text
 
-def get_payment_instructions(plan_id):
+def get_payment_instructions(plan_id, lang="en"):
     """Generates the payment message and instructions for a selected plan."""
     if plan_id not in PRICING_PLANS:
-        return "Invalid plan selected."
+        return get_text("plan_not_found", lang)
     
     plan_info = PRICING_PLANS[plan_id]
+    plan_name = get_text(f"plan_{plan_id}_name", lang)
     
-    instructions = (
-        f"<b>🛒 Purchase: {plan_info['name']}</b>\n\n"
-        f"💰 <b>Amount:</b> ${plan_info['price']} USDT (TRC20)\n"
-        f"🏦 <b>Wallet Address:</b>\n"
-        f"<code>{WALLET_ADDRESS}</code>\n\n"
-        f"⚠️ <b>Important:</b>\n"
-        f"- Send the EXACT amount mentioned above.\n"
-        f"- Ensure you use the <b>USDT (TRC20)</b> network.\n"
-        f"- After successful payment, click the <b>'I Have Paid'</b> button below."
+    return get_text(
+        "crypto_payment_instructions", 
+        lang, 
+        plan_name=plan_name, 
+        price=plan_info['price'], 
+        wallet_address=WALLET_ADDRESS
     )
-    
-    return instructions
-
-def verify_crypto_payment_placeholder(user_id, amount):
-    """
-    Placeholder for future crypto API integration (e.g., NowPayments, Coinbase, etc.).
-    Currently, we return None as payments are processed via the automated system.
-    """
-    # Logic to check on-chain transaction would go here
-    return None
