@@ -326,7 +326,7 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
 
         video_keyboard.append([
             get_buy_stars_button(lang, user_id, text="💫 Buy Stars"),
-            InlineKeyboardButton("🎬 Watch Menu", callback_data="view_demos")
+            InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")
         ])
 
         type_emoji = {"regular": "🎥", "medium": "📺", "premium": "💎"}.get(video_type, "🎬")
