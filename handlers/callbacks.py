@@ -148,9 +148,17 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
             f"⬇️ <b>Pick an option below</b>"
         )
         
-        await query.edit_message_text(
-            welcome_text, reply_markup=get_main_menu_markup(lang, user_id=user_id), parse_mode="HTML"
-        )
+        try:
+            await query.edit_message_text(
+                welcome_text, reply_markup=get_main_menu_markup(lang, user_id=user_id), parse_mode="HTML"
+            )
+        except Exception:
+            await context.bot.send_message(
+                chat_id=user_id, 
+                text=welcome_text, 
+                reply_markup=get_main_menu_markup(lang, user_id=user_id), 
+                parse_mode="HTML"
+            )
 
     # ── Buy Stars (Redirect to Cashier) ────────────────────
     elif data == "view_pricing":
@@ -251,11 +259,19 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
                           medium_count=medium_count,
                           premium_count=premium_count)
 
-        await query.edit_message_text(
-            header,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="HTML"
-        )
+        try:
+            await query.edit_message_text(
+                header,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="HTML"
+            )
+        except Exception:
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=header,
+                reply_markup=InlineKeyboardMarkup(keyboard),
+                parse_mode="HTML"
+            )
 
     # ── Demo Click — Deduct Stars & Send Protected Video ───
     elif data.startswith("demo_type_"):
@@ -375,7 +391,10 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
                 ])
             else:
                 profile_markup = back_to_main()
-        await query.edit_message_text(text, reply_markup=profile_markup, parse_mode="HTML")
+        try:
+            await query.edit_message_text(text, reply_markup=profile_markup, parse_mode="HTML")
+        except Exception:
+            await context.bot.send_message(chat_id=user_id, text=text, reply_markup=profile_markup, parse_mode="HTML")
 
     # ── Refer & Earn ───────────────────────────────────────
     elif data == "view_referral":
@@ -405,7 +424,10 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
             "<i>Rewards are credited automatically once referrals complete a purchase.</i>"
             + BRAND_FOOTER
         )
-        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        try:
+            await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        except Exception:
+            await context.bot.send_message(chat_id=user_id, text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
 
     # ── FAQ ────────────────────────────────────────────────
     elif data == "view_faq":
@@ -423,7 +445,10 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
             [InlineKeyboardButton(get_text("btn_contact_support", lang), url=f"https://t.me/{SUPPORT_USERNAME}")],
             [InlineKeyboardButton(get_text("btn_main_menu", lang), callback_data="main_menu")]
         ]
-        await query.edit_message_text(faq_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        try:
+            await query.edit_message_text(faq_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        except Exception:
+            await context.bot.send_message(chat_id=user_id, text=faq_text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
 
     # ── Admin List Views ───────────────────────────────────
     elif data in ("admin_list_pending", "admin_list_approved", "admin_list_cancelled"):
