@@ -9,8 +9,8 @@ def register_user(user_id, username, full_name, referred_by=None, language_code=
     cursor = conn.cursor()
 
     cursor.execute('''
-        INSERT OR IGNORE INTO users (user_id, username, full_name, referred_by, language)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT OR IGNORE INTO users (user_id, username, full_name, referred_by, language, stars_balance, stars_gift_from)
+        VALUES (?, ?, ?, ?, ?, 60, 'the house')
     ''', (user_id, username, full_name, referred_by, language_code))
 
     is_new_user = cursor.rowcount > 0  # True only if a row was actually inserted
@@ -26,8 +26,12 @@ def register_user(user_id, username, full_name, referred_by=None, language_code=
     conn.close()
 
     # Credit referrer ONLY if this is a brand-new user registration
+    rewarded_referrer = None
     if is_new_user and referred_by and referred_by != user_id:
         _increment_referral_count(referred_by)
+        rewarded_referrer = referred_by
+
+    return is_new_user, rewarded_referrer
 
 def update_last_seen(user_id):
     """Updates the last_seen timestamp for a user."""
@@ -41,11 +45,11 @@ def update_last_seen(user_id):
     conn.close()
 
 def _increment_referral_count(referrer_id):
-    """Increments the referral count for a given user."""
+    """Increments the referral count and awards 5 stars for a given user."""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "UPDATE users SET referral_count = referral_count + 1 WHERE user_id = ?",
+        "UPDATE users SET referral_count = referral_count + 1, stars_balance = stars_balance + 5 WHERE user_id = ?",
         (referrer_id,)
     )
     conn.commit()
@@ -384,6 +388,71 @@ def get_banned_users() -> list:
     return [dict(r) for r in rows]
 
 # ── Rate Limiting ──────────────────────────────────────────────────────────────
+
+
+# ── Dashboard Data ─────────────────────────────────────────────────────────────
+
+def get_user_dashboard_data(user_id: int) -> dict:
+    """Returns stars balance, gift source, and referral stats for the dashboard welcome."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    row = cursor.execute(
+        '''SELECT stars_balance, stars_gift_from, referral_count, username
+           FROM users WHERE user_id = ?''',
+        (user_id,)
+    ).fetchone()
+    conn.close()
+    if not row:
+        return {"stars_balance": 0, "stars_gift_from": None, "referral_count": 0, "username": None}
+    return {
+        "stars_balance": row["stars_balance"] or 0,
+        "stars_gift_from": row["stars_gift_from"],
+        "referral_count": row["referral_count"] or 0,
+        "username": row["username"],
+    }
+
+
+def admin_gift_stars(user_id: int, amount: int, source: str = "the house") -> bool:
+    """
+    Credits stars_balance to a user and marks the gift source label.
+    Returns True if the user exists and was updated.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        '''UPDATE users
+           SET stars_balance = stars_balance + ?,
+               stars_gift_from = ?
+           WHERE user_id = ?''',
+        (amount, source, user_id)
+    )
+    updated = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    return updated
+
+
+def deduct_stars(user_id: int, amount: int) -> bool:
+    """
+    Deducts `amount` stars from a user's balance atomically.
+    Returns True if successful, False if the user has insufficient stars.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    row = cursor.execute(
+        "SELECT stars_balance FROM users WHERE user_id = ?", (user_id,)
+    ).fetchone()
+    if not row or (row["stars_balance"] or 0) < amount:
+        conn.close()
+        return False
+    cursor.execute(
+        "UPDATE users SET stars_balance = stars_balance - ? WHERE user_id = ?",
+        (amount, user_id)
+    )
+    conn.commit()
+    conn.close()
+    return True
+
 
 def check_rate_limit(user_id: int, min_interval: float = 1.5) -> bool:
     """

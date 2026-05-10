@@ -1,22 +1,26 @@
 import time
+import datetime
 import logging
+import urllib.parse
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
 from config import (
     ADMIN_ID,
     PRICING_PLANS,
+    STAR_PACKAGES,
     SUPPORT_USERNAME,
     DEMO_LINK_1,
     DEMO_LINK_2,
     DEMO_LINK_3,
     DEMO_LINK_4,
     BOT_USERNAME,
+    DEMO_STAR_PRICE,
 )
 from utils.i18n import get_text
-from utils.keyboards import get_main_menu_markup, back_to_main
+from utils.keyboards import get_main_menu_markup, back_to_main, get_buy_stars_button
 
-BRAND_FOOTER = "\n\n<i>— 🌟 9-17 —</i>"
+BRAND_FOOTER = ""
 
 from services.user_service import (
     update_last_seen,
@@ -29,9 +33,13 @@ from services.user_service import (
     check_rate_limit,
     get_user_language,
     update_user_language,
+    has_active_purchase,
+    get_user_dashboard_data,
+    deduct_stars,
 )
 from services.payment_service import get_payment_instructions
-from services.stars_service import send_stars_invoice, has_active_purchase
+from services.stars_service import send_stars_invoice, send_star_package_invoice
+from services.demo_service import get_all_demo_videos, get_demo_video
 
 logger = logging.getLogger(__name__)
 
@@ -100,90 +108,78 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
         # Redirect to main menu
         await query.edit_message_text(
             get_text("welcome_text", lang), 
-            reply_markup=get_main_menu_markup(lang), 
+            reply_markup=get_main_menu_markup(lang, user_id=user_id), 
             parse_mode="HTML"
         )
         return
 
     # ── Main Menu ──────────────────────────────────────────
     if data == "main_menu":
+        dash = get_user_dashboard_data(user_id)
+        first_name = update.effective_user.first_name or update.effective_user.username or "User"
+        stars = dash["stars_balance"]
+        gift_from = dash["stars_gift_from"]
+        ref_count = dash["referral_count"]
+        ref_tag = f"ref_{user_id}"
+        ref_link = f"https://t.me/{BOT_USERNAME}?start={ref_tag}"
+
+        if gift_from and stars > 0:
+            stars_line = f"🎁 <b>{stars} ⭐</b> — gifted to you by the house"
+        else:
+            stars_line = f"⭐ <b>Stars Balance:</b>  {stars}"
+
+        joined_line = f"<b>{ref_count}</b> friend{'s' if ref_count != 1 else ''} joined so far" if ref_count > 0 else "No one joined yet — share your link!"
+
+        welcome_text = (
+            f"👋 Hello, <b>{first_name}</b>\n"
+            f"\n"
+            f"{stars_line}\n"
+            f"\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"\n"
+            f"🔗 <b>Invite &amp; Earn</b>\n"
+            f"Tap to copy your link:\n"
+            f"<code>{ref_link}</code>\n"
+            f"\n"
+            f"Each friend earns you <b>5 ⭐</b>  •  {joined_line}\n"
+            f"\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"\n"
+            f"⬇️ <b>Pick an option below</b>"
+        )
+        
         await query.edit_message_text(
-            get_text("welcome_text", lang), reply_markup=get_main_menu_markup(lang), parse_mode="HTML"
+            welcome_text, reply_markup=get_main_menu_markup(lang, user_id=user_id), parse_mode="HTML"
         )
 
-    # ── Pricing ────────────────────────────────────────────
+    # ── Buy Stars (Redirect to Cashier) ────────────────────
     elif data == "view_pricing":
         log_interaction(user_id, "view_pricing")
-        keyboard = []
-        for plan_id, info in PRICING_PLANS.items():
-            stars_hint = f"  ·  ⭐ {info['stars_price']:,}"
-            plan_label = get_text(f"plan_{plan_id}_label", lang)
-            keyboard.append([InlineKeyboardButton(
-                plan_label + stars_hint,
-                callback_data=f"buy_{plan_id}"
-            )])
-        keyboard.append([InlineKeyboardButton(get_text("btn_testimonials", lang), callback_data="view_testimonials")])
-        keyboard.append([InlineKeyboardButton(get_text("btn_main_menu", lang), callback_data="main_menu")])
-
-        await query.edit_message_text(
-            get_text("select_access_plan", lang) + BRAND_FOOTER,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="HTML"
-        )
-
-    # ── Buy a Plan — Payment Method Selection ──────────────
-    elif data.startswith("buy_"):
-        plan_id = data.replace("buy_", "")
-        plan_info = PRICING_PLANS.get(plan_id)
-        if not plan_info:
-            await query.edit_message_text(get_text("plan_not_found", lang), reply_markup=back_to_main(lang))
-            return
-        log_interaction(user_id, "view_plan", detail=plan_id)
-
-        # Upgrade / already-owned detection
-        _plan_order = ["starter", "pro", "ultimate"]
-        _ustat = get_user_status(user_id)
-        _current = (_ustat or {}).get("selected_plan") if (_ustat or {}).get("is_approved") else None
+        from config import CASHIER_BOT_USERNAME
         
-        plan_name = get_text(f"plan_{plan_id}_name", lang)
-        
-        upgrade_note = ""
-        if _current == plan_id:
-            await query.edit_message_text(
-                get_text("already_own_plan", lang, plan_name=plan_name) + BRAND_FOOTER,
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton(get_text("btn_contact_support", lang), url=f"https://t.me/{SUPPORT_USERNAME}")],
-                    [InlineKeyboardButton(get_text("btn_main_menu", lang), callback_data="main_menu")],
-                ]),
-                parse_mode="HTML"
-            )
+        if CASHIER_BOT_USERNAME == "YourCashierBotUsername":
+            await query.answer("❌ Cashier bot not configured.", show_alert=True)
             return
-        elif _current and _current in _plan_order and plan_id in _plan_order:
-            _cur_name = get_text(f"plan_{_current}_name", lang)
-            if _plan_order.index(plan_id) > _plan_order.index(_current):
-                upgrade_note = get_text("upgrade_from", lang, cur_name=_cur_name)
-            else:
-                upgrade_note = get_text("currently_have", lang, cur_name=_cur_name)
 
+        cashier_link = f"https://t.me/{CASHIER_BOT_USERNAME}?start=pay_{user_id}"
+        
         keyboard = [
-            [InlineKeyboardButton(get_text("btn_pay_crypto", lang), callback_data=f"pay_crypto_{plan_id}")],
-            [InlineKeyboardButton(get_text("btn_pay_stars", lang), callback_data=f"pay_stars_{plan_id}")],
-            [InlineKeyboardButton(get_text("btn_back_plans", lang), callback_data="view_pricing")],
+            [InlineKeyboardButton("💫 Open Secure Top-Up Portal", url=cashier_link)],
+            [InlineKeyboardButton(get_text("btn_main_menu", lang), callback_data="main_menu")]
         ]
-        
-        plan_desc = get_text(f"plan_{plan_id}_desc", lang)
-        plan_text = get_text("plan_details", lang, 
-                             plan_name=plan_name, 
-                             description=plan_desc, 
-                             price=plan_info['price'], 
-                             stars_price=f"{plan_info['stars_price']:,}", 
-                             upgrade_note=upgrade_note)
 
-        await query.edit_message_text(
-            plan_text + BRAND_FOOTER,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="HTML"
+        text = (
+            f"💫 <b>Buy Stars</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"For security and to ensure your balance is never lost, all payments are handled by our dedicated Cashier bot.\n\n"
+            f"Tap the button below to top up your account securely. Your balance will update here instantly!"
         )
+        try:
+            await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        except Exception:
+            await context.bot.send_message(chat_id=user_id, text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+
+
 
     # ── Pay with Crypto ────────────────────────────────────
     elif data.startswith("pay_crypto_"):
@@ -206,43 +202,6 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
             parse_mode="HTML"
         )
 
-    # ── Pay with Telegram Stars ────────────────────────────
-    elif data.startswith("pay_stars_"):
-        plan_id = data.replace("pay_stars_", "")
-        plan_info = PRICING_PLANS.get(plan_id)
-        if not plan_info:
-            await query.edit_message_text(get_text("plan_not_found", lang), reply_markup=back_to_main(lang))
-            return
-        log_interaction(user_id, "pay_stars", detail=plan_id)
-        
-        plan_name = get_text(f"plan_{plan_id}_name", lang)
-
-        if has_active_purchase(user_id, plan_id):
-            await query.edit_message_text(
-                get_text("already_own_plan", lang, plan_name=plan_name) + BRAND_FOOTER,
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton(get_text("btn_contact_support", lang), url=f"https://t.me/{SUPPORT_USERNAME}")],
-                    [InlineKeyboardButton(get_text("btn_main_menu", lang), callback_data="main_menu")],
-                ]),
-                parse_mode="HTML"
-            )
-            return
-
-        await send_stars_invoice(
-            bot=context.bot,
-            chat_id=user_id,
-            plan_id=plan_id,
-            user_id=user_id
-        )
-
-        await query.edit_message_text(
-            get_text("stars_invoice_sent", lang, plan_name=plan_name, stars_price=f"{plan_info['stars_price']:,}") + BRAND_FOOTER,
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton(get_text("btn_back_plans", lang), callback_data=f"buy_{plan_id}")]
-            ]),
-            parse_mode="HTML"
-        )
-
     # ── Payment Confirmation Step 1 (Crypto) ───────────────
     elif data.startswith("confirm_payment_"):
         plan_id = data.replace("confirm_payment_", "")
@@ -258,45 +217,122 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
             parse_mode="HTML"
         )
 
-    # ── Free Demos ─────────────────────────────────────────
+    # ── Watch with Stars ───────────────────────────────────
     elif data == "view_demos":
         log_interaction(user_id, "view_demos")
-        keyboard = [
-            [InlineKeyboardButton("▶️ Preview #1", callback_data="demo_click_1")],
-            [InlineKeyboardButton("▶️ Preview #2", callback_data="demo_click_2")],
-            [InlineKeyboardButton("▶️ Preview #3", callback_data="demo_click_3")],
-            [InlineKeyboardButton("▶️ Preview #4", callback_data="demo_click_4")],
-            [InlineKeyboardButton(get_text("btn_pricing", lang), callback_data="view_pricing")],
-            [InlineKeyboardButton(get_text("btn_main_menu", lang), callback_data="main_menu")]
-        ]
+        dash = get_user_dashboard_data(user_id)
+        balance = dash["stars_balance"]
+
+        # Fetch all videos and calculate available counts per type
+        videos = get_all_demo_videos()
+        real_regular = sum(1 for v in videos if v.get("video_type", "regular") == "regular")
+        real_medium  = sum(1 for v in videos if v.get("video_type", "regular") == "medium")
+        real_premium = sum(1 for v in videos if v.get("video_type", "regular") == "premium")
+
+        # Display inflated "bait" counts to encourage engagement
+        # Real videos are still served randomly — users just see a bigger vault
+        BAIT_REGULAR = 21460
+        BAIT_MEDIUM  = 12831
+        BAIT_PREMIUM = 5416
+        regular_count = real_regular + BAIT_REGULAR
+        medium_count  = real_medium  + BAIT_MEDIUM
+        premium_count = real_premium + BAIT_PREMIUM
+
+        keyboard = []
+        keyboard.append([InlineKeyboardButton(get_text("btn_watch_regular", lang), callback_data="demo_type_regular")])
+        keyboard.append([InlineKeyboardButton(get_text("btn_watch_medium", lang), callback_data="demo_type_medium")])
+        keyboard.append([InlineKeyboardButton(get_text("btn_watch_premium", lang), callback_data="demo_type_premium")])
+        keyboard.append([get_buy_stars_button(lang, user_id)])
+        keyboard.append([InlineKeyboardButton(get_text("btn_main_menu", lang), callback_data="main_menu")])
+
+        header = get_text("demo_menu_text", lang,
+                          balance=balance,
+                          regular_count=regular_count,
+                          medium_count=medium_count,
+                          premium_count=premium_count)
+
         await query.edit_message_text(
-            get_text("demo_menu_text", lang),
+            header,
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="HTML"
         )
 
-    # ── Demo Click Tracking ────────────────────────────────
-    elif data.startswith("demo_click_"):
-        demo_num = data.replace("demo_click_", "")
-        demo_key = f"demo_{demo_num}"
-        log_interaction(user_id, "view_demo", detail=demo_key)
+    # ── Demo Click — Deduct Stars & Send Protected Video ───
+    elif data.startswith("demo_type_"):
+        video_type = data.replace("demo_type_", "")
+        
+        prices = {"regular": 15, "medium": 25, "premium": 49}
+        price = prices.get(video_type, 15)
 
-        demo_url_map = {
-            "1": DEMO_LINK_1,
-            "2": DEMO_LINK_2,
-            "3": DEMO_LINK_3,
-            "4": DEMO_LINK_4,
-        }
-        url = demo_url_map.get(demo_num, DEMO_LINK_1)
+        from services.demo_service import get_random_video_by_type
+        demo = get_random_video_by_type(video_type)
+        if not demo:
+            msg = get_text("no_videos_available", lang).replace("{type}", video_type)
+            await query.answer(msg, show_alert=True)
+            return
 
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=f"🎬 <b>Preview #{demo_num}</b>\n\n👉 <a href=\"{url}\">Click here to watch</a>\n\n"
-                 f"<i>Enjoy the preview! Tap 💎 Pricing Plans to get full access.</i>"
-                 + BRAND_FOOTER,
-            parse_mode="HTML",
-            disable_web_page_preview=False
+        slot = demo["slot"]
+
+        # Deduct stars — fail gracefully if insufficient
+        success = deduct_stars(user_id, price)
+        if not success:
+            dash = get_user_dashboard_data(user_id)
+            balance = dash["stars_balance"]
+            insufficient_text = get_text("demo_insufficient_stars", lang, price=price, balance=balance)
+            insufficient_kb = InlineKeyboardMarkup([
+                [get_buy_stars_button(lang, user_id)],
+                [InlineKeyboardButton(get_text("btn_main_menu", lang), callback_data="main_menu")],
+            ])
+            try:
+                await query.edit_message_text(insufficient_text, reply_markup=insufficient_kb, parse_mode="HTML")
+            except Exception:
+                await context.bot.send_message(chat_id=user_id, text=insufficient_text, reply_markup=insufficient_kb, parse_mode="HTML")
+            return
+
+        log_interaction(user_id, "view_demo", detail=f"demo_{slot}_{video_type}")
+
+        # Updated balance after deduction
+        dash = get_user_dashboard_data(user_id)
+        new_balance = dash["stars_balance"]
+
+        # Build video inline keyboard
+        video_keyboard = []
+        can_afford = new_balance >= price
+        if can_afford:
+            next_label = f"▶️ Watch Another {video_type.capitalize()}  ·  {price} ⭐"
+        else:
+            need = price - new_balance
+            next_label = f"⚠️ Watch Another {video_type.capitalize()}  ·  {price} ⭐  (need {need} more)"
+        
+        video_keyboard.append([
+            InlineKeyboardButton(next_label, callback_data=f"demo_type_{video_type}")
+        ])
+
+        video_keyboard.append([
+            get_buy_stars_button(lang, user_id, text="💫 Buy Stars"),
+            InlineKeyboardButton("🎬 Watch Menu", callback_data="view_demos")
+        ])
+
+        type_emoji = {"regular": "🎥", "medium": "📺", "premium": "💎"}.get(video_type, "🎬")
+        caption = (
+            f"{type_emoji} <b>{video_type.capitalize()} Video</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"⭐ <b>{price} Stars deducted</b>  •  Balance: <b>{new_balance} ⭐</b>\n\n"
+            f"<i>Want more? Tap 💫 Buy Stars to top up.</i>"
         )
+
+        await context.bot.send_video(
+            chat_id=user_id,
+            video=demo["file_id"],
+            caption=caption,
+            reply_markup=InlineKeyboardMarkup(video_keyboard),
+            parse_mode="HTML",
+            supports_streaming=True,
+            protect_content=True,
+        )
+
+        # Silently acknowledge — the video itself carries the keyboard
+        await query.answer()
 
     # ── My Profile ─────────────────────────────────────────
     elif data == "view_profile":
@@ -346,10 +382,19 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
         log_interaction(user_id, "view_referral")
         status = get_user_status(user_id)
         referral_count = status.get("referral_count", 0) if status else 0
+        
+        keyboard = []
         if BOT_USERNAME == "YourBotUsername":
             link_display = "Referral links not configured - set BOT_USERNAME in .env"
         else:
-            link_display = f"<code>https://t.me/{BOT_USERNAME}?start=ref_{user_id}</code>"
+            ref_link = f"https://t.me/{BOT_USERNAME}?start=ref_{user_id}"
+            link_display = f"<code>{ref_link}</code>"
+            share_text = get_text("share_msg", lang)
+            share_url = f"https://t.me/share/url?url={urllib.parse.quote(ref_link)}&text={urllib.parse.quote(share_text)}"
+            keyboard.append([InlineKeyboardButton(get_text("btn_share_friend", lang), url=share_url)])
+            
+        keyboard.append([InlineKeyboardButton(get_text("btn_main_menu", lang), callback_data="main_menu")])
+
         text = (
             "🔗 <b>Refer & Earn</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -360,7 +405,7 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
             "<i>Rewards are credited automatically once referrals complete a purchase.</i>"
             + BRAND_FOOTER
         )
-        await query.edit_message_text(text, reply_markup=back_to_main(), parse_mode="HTML")
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
 
     # ── FAQ ────────────────────────────────────────────────
     elif data == "view_faq":
@@ -440,7 +485,7 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
             + BRAND_FOOTER
         )
         keyboard = [
-            [InlineKeyboardButton("💎 Get Full Access", callback_data="view_pricing")],
+            [get_buy_stars_button(lang, user_id, text="💎 Get Full Access")],
             [InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]
         ]
         await query.edit_message_text(
@@ -448,3 +493,43 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="HTML"
         )
+
+async def send_nudge(context: ContextTypes.DEFAULT_TYPE):
+    """Background task: Follow up with a user who viewed a plan 24h ago but didn't buy."""
+    job = context.job
+    data = job.data
+    user_id = data["user_id"]
+    plan_id = data["plan_id"]
+    lang = data["lang"]
+    
+    # Check if they already bought
+    if has_active_purchase(user_id, plan_id):
+        return
+        
+    user_status = get_user_status(user_id)
+    if not user_status:
+        return
+        
+    # Also check DB for crypto approval on this plan
+    if user_status.get("is_approved") and user_status.get("selected_plan") == plan_id:
+        return
+
+    plan_name = PRICING_PLANS.get(plan_id, {}).get("name", plan_id.capitalize())
+    first_name = user_status.get("full_name") or user_status.get("username") or "there"
+    
+    nudge_text = get_text("re_engagement_nudge", lang, first_name=first_name, plan_name=plan_name)
+    
+    keyboard = [
+        [InlineKeyboardButton("💎 Complete Purchase", callback_data=f"buy_{plan_id}")],
+        [InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]
+    ]
+    
+    try:
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=nudge_text + BRAND_FOOTER,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        logger.error(f"Failed to send re-engagement nudge to {user_id}: {e}")

@@ -25,7 +25,9 @@ def init_db():
             is_approved INTEGER DEFAULT 0,
             referred_by INTEGER DEFAULT NULL,
             referral_count INTEGER DEFAULT 0,
-            language TEXT DEFAULT NULL
+            language TEXT DEFAULT NULL,
+            stars_balance INTEGER DEFAULT 0,
+            stars_gift_from TEXT DEFAULT NULL
         )
     ''')
 
@@ -72,6 +74,20 @@ def init_db():
         )
     ''')
 
+    # ── Demo Videos Table ───────────────────────────────────────────────────────
+    # Stores admin-uploaded preview video file_ids with per-slot star prices
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS demo_videos (
+            slot       INTEGER PRIMARY KEY,
+            file_id    TEXT    NOT NULL,
+            price      INTEGER NOT NULL DEFAULT 15,
+            title      TEXT    DEFAULT NULL,
+            video_type TEXT    DEFAULT 'regular',
+            duration   INTEGER DEFAULT NULL,
+            uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     _migrate(cursor)
     conn.commit()
     conn.close()
@@ -81,15 +97,27 @@ def _migrate(cursor):
     # Users table migrations
     existing_users = {row[1] for row in cursor.execute("PRAGMA table_info(users)")}
     user_migrations = [
-        ("referred_by",    "INTEGER DEFAULT NULL"),
-        ("referral_count", "INTEGER DEFAULT 0"),
-        ("payment_method", "TEXT DEFAULT 'crypto'"),
-        ("last_seen",      "TIMESTAMP"), # SQLite complains about CURRENT_TIMESTAMP in ALTER TABLE
-        ("language",       "TEXT DEFAULT NULL"),
+        ("referred_by",       "INTEGER DEFAULT NULL"),
+        ("referral_count",    "INTEGER DEFAULT 0"),
+        ("payment_method",    "TEXT DEFAULT 'crypto'"),
+        ("last_seen",         "TIMESTAMP"), # SQLite complains about CURRENT_TIMESTAMP in ALTER TABLE
+        ("language",          "TEXT DEFAULT NULL"),
+        ("stars_balance",     "INTEGER DEFAULT 0"),
+        ("stars_gift_from",   "TEXT DEFAULT NULL"),
     ]
     for col, definition in user_migrations:
         if col not in existing_users:
             cursor.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
+            
+    # Demo videos table migrations
+    existing_demos = {row[1] for row in cursor.execute("PRAGMA table_info(demo_videos)")}
+    demo_migrations = [
+        ("video_type", "TEXT DEFAULT 'regular'"),
+        ("duration",   "INTEGER DEFAULT NULL"),
+    ]
+    for col, definition in demo_migrations:
+        if col not in existing_demos:
+            cursor.execute(f"ALTER TABLE demo_videos ADD COLUMN {col} {definition}")
 
 
 def get_db_connection():

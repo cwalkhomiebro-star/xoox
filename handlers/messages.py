@@ -58,15 +58,6 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             
         await update.message.reply_text(success_msg, parse_mode="HTML")
         
-        # Give referral reward
-        if newly_approved and referred_by:
-            try:
-                ref_lang = get_user_language(referred_by)
-                reward_msg = get_text("referral_reward", ref_lang)
-                await context.bot.send_message(chat_id=referred_by, text=reward_msg, parse_mode="HTML")
-            except Exception as e:
-                logger.error(f"Failed to send referral reward: {e}")
-                
         # Notify Admin
         admin_notif = (
             "✅ <b>AUTO-VERIFIED CRYPTO PAYMENT</b>\n"

@@ -6,10 +6,11 @@ from config import (
     ADMIN_ID,
     CHANNEL_ID,
     PRICING_PLANS,
+    STAR_PACKAGES,
 )
 
-from services.user_service import log_interaction, get_user_language
-from services.stars_service import parse_payload, record_stars_purchase
+from services.user_service import log_interaction, get_user_language, record_stars_purchase, admin_gift_stars
+from services.stars_service import parse_payload
 from utils.i18n import get_text
 
 logger = logging.getLogger(__name__)
@@ -33,13 +34,9 @@ async def pre_checkout_query_handler(update: Update, context: ContextTypes.DEFAU
 
 async def successful_payment_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Fired by Telegram after a Stars payment is successfully completed.
-    1. Parse and verify the payload
-    2. Prevent duplicate delivery (idempotent via charge_id)
-    3. Record purchase in database
-    4. Generate a single-use invite link to the private channel
-    5. Deliver the link to the user automatically
-    6. Notify admin of the Stars sale
+    Fired by Telegram after a Stars payment is completed.
+    - Star top-up packages → credit internal stars balance
+    - Legacy content plans  → generate invite link (backward compat)
     """
     payment = update.message.successful_payment
     user_id = update.effective_user.id
@@ -58,11 +55,54 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
         )
         return
 
-    plan_info = PRICING_PLANS[plan_id]
     lang = get_user_language(user_id)
-    plan_name = get_text(f"plan_{plan_id}_name", lang)
 
-    # Record purchase (IGNORE on duplicate charge_id = safe idempotent)
+    # ── Star Top-Up Package ────────────────────────────────────────────────────
+    if plan_id in STAR_PACKAGES:
+        pkg = STAR_PACKAGES[plan_id]
+        credited = pkg["stars_credited"]
+        bonus    = pkg["bonus"]
+
+        admin_gift_stars(user_id, credited, source=f"purchase_{plan_id}")
+        log_interaction(user_id, "stars_topup", detail=f"{plan_id}:{credited}")
+
+        logger.info(
+            f"Star top-up complete: user={user_id}, pkg='{plan_id}', "
+            f"paid={payment.total_amount}, credited={credited}, charge={charge_id}"
+        )
+
+        bonus_text = f" (+{bonus} bonus)" if bonus > 0 else ""
+        success_msg = (
+            f"✅ <b>Stars Added!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"💫 <b>+{credited} ⭐</b> have been added to your balance{bonus_text}.\n\n"
+            f"<i>Go watch some previews! Tap 🌟 Watch with Stars from the menu.</i>"
+        )
+        await update.message.reply_text(success_msg, parse_mode="HTML")
+
+        # Admin notification
+        admin_msg = (
+            f"💫 <b>NEW STAR TOP-UP</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🆔 <b>User:</b> <code>{user_id}</code>\n"
+            f"📦 <b>Package:</b> {pkg['name']}\n"
+            f"⭐ <b>Paid:</b> {payment.total_amount:,} Stars\n"
+            f"💰 <b>Credited:</b> {credited} Stars{bonus_text}\n"
+            f"🔑 <b>Charge ID:</b> <code>{charge_id}</code>"
+        )
+        try:
+            await context.bot.send_message(chat_id=ADMIN_ID, text=admin_msg, parse_mode="HTML")
+        except Exception as e:
+            logger.error(f"Failed to notify admin of star top-up: {e}")
+        return
+
+    # ── Legacy Content Plan ────────────────────────────────────────────────────
+    plan_info = PRICING_PLANS.get(plan_id)
+    if not plan_info:
+        await update.message.reply_text("⚠️ Unknown plan. Please contact support.")
+        return
+
+    plan_name = get_text(f"plan_{plan_id}_name", lang)
     newly_approved, referred_by = record_stars_purchase(user_id, plan_id, charge_id)
     log_interaction(user_id, "payment_completed_stars", detail=plan_id)
 
@@ -71,7 +111,6 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
         f"stars={payment.total_amount}, charge_id={charge_id}"
     )
 
-    # Generate Single-Use Invite Link
     try:
         invite_link = await context.bot.create_chat_invite_link(
             chat_id=CHANNEL_ID,
@@ -89,15 +128,6 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
         success_msg = get_text("payment_confirmed_no_link", lang, plan_name=plan_name)
 
     await update.message.reply_text(success_msg, parse_mode="HTML")
-
-    # Give referral reward
-    if newly_approved and referred_by:
-        try:
-            ref_lang = get_user_language(referred_by)
-            reward_msg = get_text("referral_reward", ref_lang)
-            await context.bot.send_message(chat_id=referred_by, text=reward_msg, parse_mode="HTML")
-        except Exception as e:
-            logger.error(f"Failed to send referral reward to {referred_by}: {e}")
 
     admin_msg = (
         f"⭐ <b>NEW STARS PAYMENT — AUTO-APPROVED</b>\n"

@@ -102,14 +102,15 @@ from utils.keyboards import get_main_menu_markup, back_to_main
 from handlers.commands import (
     start, admin_approve, admin_cancel_user, admin_list_pending, admin_panel,
     admin_stats, admin_users, admin_demos, admin_broadcast, admin_ban, admin_unban,
-    admin_lookup, admin_refund, admin_broadcast_pending, admin_broadcast_plan
+    admin_lookup, admin_refund, admin_broadcast_pending, admin_broadcast_plan,
+    admin_giftstars, admin_setpreview, admin_listpreviews, handle_video_upload,
+    admin_recategorize,
 )
 from handlers.messages import handle_text_message
 
 # ── CALLBACK HANDLER ───────────────────────────────────────────────────────────
 
 from handlers.callbacks import handle_callback
-from handlers.payments import pre_checkout_query_handler, successful_payment_handler
 
 import html
 import json
@@ -172,16 +173,22 @@ def main():
     app.add_handler(CommandHandler("unban",      admin_unban))      # P4: unban user
     app.add_handler(CommandHandler("lookup",     admin_lookup))     # P4: lookup user
     app.add_handler(CommandHandler("refund",     admin_refund))     # P4: Stars refund
+    app.add_handler(CommandHandler("giftstars",    admin_giftstars))    # Gift ⭐ to user
+    app.add_handler(CommandHandler("setpreview",   admin_setpreview))   # Upload preview video
+    app.add_handler(CommandHandler("listpreviews", admin_listpreviews)) # List preview videos
+    app.add_handler(CommandHandler("recategorize", admin_recategorize)) # Re-categorize by duration
 
     # ── Inline Button Handler ──────────────────────────────
     app.add_handler(CallbackQueryHandler(handle_callback))
 
-    # ── Telegram Stars Payment Handlers ────────────────────
-    app.add_handler(PreCheckoutQueryHandler(pre_checkout_query_handler))
-    app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_handler))
-
     # ── Text Message Handler (for TxID) ────────────────────
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_message))
+
+    # ── Video Upload Handler (admin preview uploads) ────────
+    app.add_handler(MessageHandler(
+        (filters.VIDEO | filters.Document.VIDEO) & ~filters.COMMAND,
+        handle_video_upload
+    ))
 
     # ── Error Handler ──────────────────────────────────────
     app.add_error_handler(error_handler)
