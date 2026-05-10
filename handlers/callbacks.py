@@ -313,16 +313,15 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
 
         # Build video inline keyboard
         video_keyboard = []
-        can_afford = new_balance >= price
-        if can_afford:
-            next_label = f"▶️ Watch Another {video_type.capitalize()}  ·  {price} ⭐"
-        else:
-            need = price - new_balance
-            next_label = f"⚠️ Watch Another {video_type.capitalize()}  ·  {price} ⭐  (need {need} more)"
-        
-        video_keyboard.append([
-            InlineKeyboardButton(next_label, callback_data=f"demo_type_{video_type}")
-        ])
+        all_prices = {"regular": 15, "medium": 25, "premium": 49}
+        for v_type, v_price in all_prices.items():
+            if new_balance >= v_price:
+                label = f"▶️ Watch Another {v_type.capitalize()}  ·  {v_price} ⭐"
+            else:
+                need = v_price - new_balance
+                label = f"⚠️ Watch {v_type.capitalize()}  ·  {v_price} ⭐  (need {need})"
+            video_keyboard.append([InlineKeyboardButton(label, callback_data=f"demo_type_{v_type}")])
+
 
         video_keyboard.append([
             get_buy_stars_button(lang, user_id, text="💫 Buy Stars"),
