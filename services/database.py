@@ -5,7 +5,7 @@ import os
 # When TURSO_DATABASE_URL + TURSO_AUTH_TOKEN are set, all DB calls go to Turso.
 # Otherwise falls back to local SQLite (for local development / Render).
 try:
-    import libsql_experimental as libsql
+    import libsql
     _LIBSQL_AVAILABLE = True
 except ImportError:
     _LIBSQL_AVAILABLE = False
@@ -20,12 +20,79 @@ def _turso_enabled() -> bool:
     return bool(TURSO_URL and TURSO_TOKEN and _LIBSQL_AVAILABLE)
 
 
+class CustomRow:
+    def __init__(self, cursor, tuple_row):
+        self._row = tuple_row
+        self._keys = [col[0] for col in cursor.description] if cursor.description else []
+
+    def keys(self):
+        return self._keys
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return self._row[key]
+        try:
+            return self._row[self._keys.index(key)]
+        except ValueError:
+            raise KeyError(key)
+
+    def __iter__(self):
+        return iter(self._row)
+
+    def __len__(self):
+        return len(self._row)
+
+
+class LibsqlCursorWrapper:
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def fetchone(self):
+        row = self._cursor.fetchone()
+        return CustomRow(self._cursor, row) if row else None
+
+    def fetchall(self):
+        return [CustomRow(self._cursor, row) for row in self._cursor.fetchall()]
+
+    def __iter__(self):
+        for row in self._cursor.fetchall():
+            yield CustomRow(self._cursor, row)
+            
+    def execute(self, *args, **kwargs):
+        self._cursor.execute(*args, **kwargs)
+        return self
+        
+    def __getattr__(self, name):
+        return getattr(self._cursor, name)
+
+
+class LibsqlConnectionWrapper:
+    def __init__(self, conn):
+        self._conn = conn
+
+    def cursor(self):
+        return LibsqlCursorWrapper(self._conn.cursor())
+
+    def execute(self, *args, **kwargs):
+        cursor = self.cursor()
+        cursor.execute(*args, **kwargs)
+        return cursor
+
+    def commit(self):
+        self._conn.commit()
+
+    def close(self):
+        self._conn.close()
+        
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+
 def get_db_connection():
     """Returns a DB connection — Turso (remote) or SQLite (local)."""
     if _turso_enabled():
         conn = libsql.connect(TURSO_URL, auth_token=TURSO_TOKEN)
-        conn.row_factory = sqlite3.Row
-        return conn
+        return LibsqlConnectionWrapper(conn)
     else:
         conn = sqlite3.connect(DB_PATH, timeout=10)
         conn.execute("PRAGMA journal_mode=WAL")
