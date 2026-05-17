@@ -93,6 +93,8 @@ def get_db_connection():
     if _turso_enabled():
         conn = libsql.connect(TURSO_URL, auth_token=TURSO_TOKEN)
         return LibsqlConnectionWrapper(conn)
+    elif os.getenv("VERCEL") == "1":
+        raise RuntimeError(f"Vercel Deployment Error: Turso database is not configured or failed to load. _LIBSQL_AVAILABLE={_LIBSQL_AVAILABLE}, URL={bool(TURSO_URL)}, TOKEN={bool(TURSO_TOKEN)}")
     else:
         conn = sqlite3.connect(DB_PATH, timeout=10)
         conn.execute("PRAGMA journal_mode=WAL")
