@@ -1,16 +1,43 @@
 import sqlite3
 import os
+
+# ── Turso / libsql support ─────────────────────────────────────────────────────
+# When TURSO_DATABASE_URL + TURSO_AUTH_TOKEN are set, all DB calls go to Turso.
+# Otherwise falls back to local SQLite (for local development / Render).
+try:
+    import libsql_experimental as libsql
+    _LIBSQL_AVAILABLE = True
+except ImportError:
+    _LIBSQL_AVAILABLE = False
+
 from config import DB_PATH
 
+TURSO_URL   = os.getenv("TURSO_DATABASE_URL")
+TURSO_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
+
+
+def _turso_enabled() -> bool:
+    return bool(TURSO_URL and TURSO_TOKEN and _LIBSQL_AVAILABLE)
+
+
+def get_db_connection():
+    """Returns a DB connection — Turso (remote) or SQLite (local)."""
+    if _turso_enabled():
+        conn = libsql.connect(TURSO_URL, auth_token=TURSO_TOKEN)
+        conn.row_factory = sqlite3.Row
+        return conn
+    else:
+        conn = sqlite3.connect(DB_PATH, timeout=10)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.row_factory = sqlite3.Row
+        return conn
+
+
 def init_db():
-    """Initializes the SQLite database with user, payment, and interaction tracking."""
-    db_dir = os.path.dirname(DB_PATH)  # empty string when DB_PATH is a bare filename
-    if db_dir:  # only makedirs when there's actually a sub-directory component
-        os.makedirs(db_dir, exist_ok=True)
-    
-    conn = sqlite3.connect(DB_PATH, timeout=10)
+    """Initializes the database tables. Safe to call multiple times (idempotent)."""
+    conn = get_db_connection()
     cursor = conn.cursor()
-    
+
     # ── Users & Payments Table ─────────────────────────────────────────────────
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
@@ -32,7 +59,6 @@ def init_db():
     ''')
 
     # ── Purchases Table ────────────────────────────────────────────────────────
-    # One row per successful purchase — enables duplicate prevention & multi-product support
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS purchases (
             purchase_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,7 +72,6 @@ def init_db():
     ''')
 
     # ── Interactions Table ─────────────────────────────────────────────────────
-    # Logs every meaningful action a user takes in the bot
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS interactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,7 +100,6 @@ def init_db():
     ''')
 
     # ── Demo Videos Table ───────────────────────────────────────────────────────
-    # Stores admin-uploaded preview video file_ids with per-slot star prices
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS demo_videos (
             slot       INTEGER PRIMARY KEY,
@@ -92,24 +116,23 @@ def init_db():
     conn.commit()
     conn.close()
 
+
 def _migrate(cursor):
     """Adds new columns to existing tables if they don't exist yet (safe upgrade path)."""
-    # Users table migrations
     existing_users = {row[1] for row in cursor.execute("PRAGMA table_info(users)")}
     user_migrations = [
-        ("referred_by",       "INTEGER DEFAULT NULL"),
-        ("referral_count",    "INTEGER DEFAULT 0"),
-        ("payment_method",    "TEXT DEFAULT 'crypto'"),
-        ("last_seen",         "TIMESTAMP"), # SQLite complains about CURRENT_TIMESTAMP in ALTER TABLE
-        ("language",          "TEXT DEFAULT NULL"),
-        ("stars_balance",     "INTEGER DEFAULT 0"),
-        ("stars_gift_from",   "TEXT DEFAULT NULL"),
+        ("referred_by",     "INTEGER DEFAULT NULL"),
+        ("referral_count",  "INTEGER DEFAULT 0"),
+        ("payment_method",  "TEXT DEFAULT 'crypto'"),
+        ("last_seen",       "TIMESTAMP"),
+        ("language",        "TEXT DEFAULT NULL"),
+        ("stars_balance",   "INTEGER DEFAULT 0"),
+        ("stars_gift_from", "TEXT DEFAULT NULL"),
     ]
     for col, definition in user_migrations:
         if col not in existing_users:
             cursor.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
-            
-    # Demo videos table migrations
+
     existing_demos = {row[1] for row in cursor.execute("PRAGMA table_info(demo_videos)")}
     demo_migrations = [
         ("video_type", "TEXT DEFAULT 'regular'"),
@@ -118,11 +141,3 @@ def _migrate(cursor):
     for col, definition in demo_migrations:
         if col not in existing_demos:
             cursor.execute(f"ALTER TABLE demo_videos ADD COLUMN {col} {definition}")
-
-
-def get_db_connection():
-    """Returns a connection to the SQLite database."""
-    conn = sqlite3.connect(DB_PATH, timeout=10)
-    conn.execute("PRAGMA journal_mode=WAL")  # WAL mode: crash-safe, concurrent-read-friendly
-    conn.row_factory = sqlite3.Row
-    return conn

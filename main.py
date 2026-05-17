@@ -1,12 +1,13 @@
 import asyncio
 import logging
 import os
-import signal
-import threading
-import time
-from flask import Flask
+import html
+import json
+import traceback
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
+    Application,
     ApplicationBuilder,
     CommandHandler,
     CallbackQueryHandler,
@@ -15,19 +16,6 @@ from telegram.ext import (
     PreCheckoutQueryHandler,
     filters,
 )
-
-# ── Health Server (keeps Render alive) ─────────────────────────────────────────
-health_app = Flask(__name__)
-
-@health_app.route("/")
-@health_app.route("/health")
-def health():
-    return "Bot is running! ✅", 200
-
-def run_health_server():
-    port = int(os.environ.get("PORT", 8080))
-    logger.info(f"Health server starting on port {port}")
-    health_app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
 from config import (
     TOKEN,
@@ -90,14 +78,10 @@ DEMO_NAMES = {
 
 # ── Rate Limiting ──────────────────────────────────────────────────────────
 import time
-_user_last_action: dict[int, float] = {}  # user_id -> last action timestamp
-RATE_LIMIT_SECONDS = 1.5  # minimum seconds between button presses per user
-
-# ── MENU HELPERS ───────────────────────────────────────────────────────────────
+_user_last_action: dict[int, float] = {}
+RATE_LIMIT_SECONDS = 1.5
 
 from utils.keyboards import get_main_menu_markup, back_to_main
-
-# ── COMMAND HANDLERS ───────────────────────────────────────────────────────────
 
 from handlers.commands import (
     start, admin_approve, admin_cancel_user, admin_list_pending, admin_panel,
@@ -107,14 +91,9 @@ from handlers.commands import (
     admin_recategorize,
 )
 from handlers.messages import handle_text_message
-
-# ── CALLBACK HANDLER ───────────────────────────────────────────────────────────
-
 from handlers.callbacks import handle_callback
+from handlers.payments import pre_checkout_query_handler, successful_payment_handler
 
-import html
-import json
-import traceback
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Log the error and send a telegram message to notify the developer."""
@@ -131,7 +110,6 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     )
 
     try:
-        # Telegram max message length is 4096 characters
         for i in range(0, len(message), 4000):
             await context.bot.send_message(
                 chat_id=ADMIN_ID, text=message[i:i+4000], parse_mode="HTML"
@@ -139,77 +117,74 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
     except Exception as e:
         logger.error(f"Failed to send error alert to ADMIN_ID: {e}")
 
-# ── MAIN EXECUTION ─────────────────────────────────────────────────────────────
 
-def main():
-    """Initializes and runs the bot."""
-    init_db()
+def _register_handlers(app: Application) -> None:
+    """Register all command, callback, and message handlers."""
+    # Command Handlers
+    app.add_handler(CommandHandler("start",              start))
+    app.add_handler(CommandHandler("approve",            admin_approve))
+    app.add_handler(CommandHandler("cancel",             admin_cancel_user))
+    app.add_handler(CommandHandler("pending",            admin_list_pending))
+    app.add_handler(CommandHandler("stats",              admin_stats))
+    app.add_handler(CommandHandler("admin",              admin_panel))
+    app.add_handler(CommandHandler("users",              admin_users))
+    app.add_handler(CommandHandler("demos",              admin_demos))
+    app.add_handler(CommandHandler("broadcast",          admin_broadcast))
+    app.add_handler(CommandHandler("broadcast_pending",  admin_broadcast_pending))
+    app.add_handler(CommandHandler("broadcast_plan",     admin_broadcast_plan))
+    app.add_handler(CommandHandler("ban",                admin_ban))
+    app.add_handler(CommandHandler("unban",              admin_unban))
+    app.add_handler(CommandHandler("lookup",             admin_lookup))
+    app.add_handler(CommandHandler("refund",             admin_refund))
+    app.add_handler(CommandHandler("giftstars",          admin_giftstars))
+    app.add_handler(CommandHandler("setpreview",         admin_setpreview))
+    app.add_handler(CommandHandler("listpreviews",       admin_listpreviews))
+    app.add_handler(CommandHandler("recategorize",       admin_recategorize))
 
-    # Graceful SIGTERM shutdown — Render sends SIGTERM before restarting containers
-    def _on_sigterm(signum, frame):
-        logger.info("Received SIGTERM — shutting down cleanly.")
-        raise SystemExit(0)
-    signal.signal(signal.SIGTERM, _on_sigterm)
-
-    if not TOKEN:
-        logger.error("No TELEGRAM_BOT_TOKEN found in .env file.")
-        return
-
-    app = ApplicationBuilder().token(TOKEN).build()
-
-    # ── Command Handlers ───────────────────────────────────
-    app.add_handler(CommandHandler("start",      start))
-    app.add_handler(CommandHandler("approve",    admin_approve))
-    app.add_handler(CommandHandler("cancel",     admin_cancel_user))
-    app.add_handler(CommandHandler("pending",    admin_list_pending))
-    app.add_handler(CommandHandler("stats",      admin_stats))
-    app.add_handler(CommandHandler("admin",      admin_panel))
-    app.add_handler(CommandHandler("users",      admin_users))      # all users list
-    app.add_handler(CommandHandler("demos",      admin_demos))      # demo analytics
-    app.add_handler(CommandHandler("broadcast",  admin_broadcast))  # P4: broadcast
-    app.add_handler(CommandHandler("broadcast_pending", admin_broadcast_pending))
-    app.add_handler(CommandHandler("broadcast_plan", admin_broadcast_plan))
-    app.add_handler(CommandHandler("ban",        admin_ban))        # P4: ban user
-    app.add_handler(CommandHandler("unban",      admin_unban))      # P4: unban user
-    app.add_handler(CommandHandler("lookup",     admin_lookup))     # P4: lookup user
-    app.add_handler(CommandHandler("refund",     admin_refund))     # P4: Stars refund
-    app.add_handler(CommandHandler("giftstars",    admin_giftstars))    # Gift ⭐ to user
-    app.add_handler(CommandHandler("setpreview",   admin_setpreview))   # Upload preview video
-    app.add_handler(CommandHandler("listpreviews", admin_listpreviews)) # List preview videos
-    app.add_handler(CommandHandler("recategorize", admin_recategorize)) # Re-categorize by duration
-
-    # ── Inline Button Handler ──────────────────────────────
+    # Inline Button Handler
     app.add_handler(CallbackQueryHandler(handle_callback))
 
-    # ── Text Message Handler (for TxID) ────────────────────
+    # Payment Handlers
+    app.add_handler(PreCheckoutQueryHandler(pre_checkout_query_handler))
+    app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_handler))
+
+    # Text Message Handler (for TxID)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_message))
 
-    # ── Video Upload Handler (admin preview uploads) ────────
+    # Video Upload Handler (admin preview uploads)
     app.add_handler(MessageHandler(
         (filters.VIDEO | filters.Document.VIDEO) & ~filters.COMMAND,
         handle_video_upload
     ))
 
-    # ── Error Handler ──────────────────────────────────────
+    # Error Handler
     app.add_error_handler(error_handler)
 
-    WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
-    if WEBHOOK_URL:
-        PORT = int(os.environ.get("PORT", 8080))
-        logger.info(f"Starting webhook on port {PORT} at {WEBHOOK_URL}")
-        app.run_webhook(
-            listen="0.0.0.0",
-            port=PORT,
-            secret_token=os.environ.get("WEBHOOK_SECRET", "super-secret-token"),
-            webhook_url=WEBHOOK_URL
-        )
-    else:
-        # Start health server on background thread (required for Render free tier)
-        health_thread = threading.Thread(target=run_health_server, daemon=True)
-        health_thread.start()
-        logger.info("Health server thread started.")
-        logger.info("Bot started and listening for messages (Polling)...")
-        app.run_polling()
+
+def build_application() -> Application:
+    """
+    Build the PTB Application for Vercel webhook mode.
+    Uses updater=None so PTB does NOT start its own server.
+    The caller must call: await app.initialize() before processing updates.
+    """
+    if not TOKEN:
+        raise RuntimeError("TELEGRAM_BOT_TOKEN is not set.")
+    ptb_app = ApplicationBuilder().token(TOKEN).updater(None).build()
+    _register_handlers(ptb_app)
+    return ptb_app
+
+
+def main():
+    """Run in polling mode — for LOCAL development and Render only."""
+    init_db()
+    if not TOKEN:
+        logger.error("No TELEGRAM_BOT_TOKEN found in .env file.")
+        return
+    ptb_app = ApplicationBuilder().token(TOKEN).build()
+    _register_handlers(ptb_app)
+    logger.info("Bot started in polling mode...")
+    ptb_app.run_polling()
+
 
 if __name__ == "__main__":
     main()
