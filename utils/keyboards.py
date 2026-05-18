@@ -21,6 +21,9 @@ def get_main_menu_markup(lang: str = "en", user_id: int = None):
             InlineKeyboardButton(get_text("btn_demos", lang),    callback_data="view_demos"),
         ],
         [
+            InlineKeyboardButton("🪙 Buy Stars with Crypto", callback_data="buy_crypto_stars"),
+        ],
+        [
             InlineKeyboardButton(get_text("btn_profile", lang),  callback_data="view_profile"),
             InlineKeyboardButton(get_text("btn_referral", lang), callback_data="view_referral"),
         ],

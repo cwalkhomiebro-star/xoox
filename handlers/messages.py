@@ -17,8 +17,42 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     text = update.message.text.strip()
     
     plan_id = context.user_data.get("awaiting_txid")
-    if not plan_id:
+    crypto_star_pkg_id = context.user_data.get("awaiting_crypto_star_txid")
+    
+    if not plan_id and not crypto_star_pkg_id:
         return # Ignore messages when not awaiting TxID
+
+    # ── Handle Star Package Crypto Payment ──
+    if crypto_star_pkg_id:
+        from config import STAR_PACKAGES
+        pkg = STAR_PACKAGES.get(crypto_star_pkg_id)
+        if not pkg:
+            del context.user_data["awaiting_crypto_star_txid"]
+            return
+            
+        lang = get_user_language(user_id)
+        
+        # We received a TXID. Tell user it's pending review.
+        await update.message.reply_text("✅ <b>TxID Received!</b>\n\nYour transaction is now pending review. Your stars will be credited once the payment is confirmed.", parse_mode="HTML")
+        
+        del context.user_data["awaiting_crypto_star_txid"]
+        
+        # Notify Admin for manual review (or they can use crypto_service auto-verify later)
+        admin_notif = (
+            "🔔 <b>CRYPTO PAYMENT FOR STARS (MANUAL REVIEW)</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🆔 <b>User ID:</b> <code>{user_id}</code>\n"
+            f"👤 <b>Username:</b> @{update.effective_user.username or 'N/A'}\n"
+            f"📦 <b>Package:</b> {pkg['name']} ({pkg['usd']})\n"
+            f"⭐ <b>Stars to Credit:</b> {pkg['stars_credited']}\n\n"
+            f"🔍 <b>TxID provided:</b>\n<code>{text}</code>\n\n"
+            f"▶️ <b>To approve and grant stars, copy & send:</b>\n"
+            f"<code>/giftstars {user_id} {pkg['stars_credited']}</code>"
+        )
+        await context.bot.send_message(chat_id=ADMIN_ID, text=admin_notif, parse_mode="HTML")
+        return
+        
+    # ── Handle Legacy Plan Crypto Payment ──
         
     if plan_id not in PRICING_PLANS:
         # Invalid state

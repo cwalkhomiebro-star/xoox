@@ -189,7 +189,58 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
 
 
 
-    # ── Pay with Crypto ────────────────────────────────────
+    # ── Buy Stars with Crypto ──────────────────────────────
+    elif data == "buy_crypto_stars":
+        log_interaction(user_id, "view_pricing")
+        from config import STAR_PACKAGES
+        keyboard = []
+        for pkg_id, pkg in STAR_PACKAGES.items():
+            bonus_text = f" (+{pkg['bonus']} bonus)" if pkg['bonus'] > 0 else ""
+            label = f"{pkg['name']}: {pkg['stars_credited']} ⭐{bonus_text}  ·  {pkg['usd']}"
+            keyboard.append([InlineKeyboardButton(label, callback_data=f"buy_cryptopkg_{pkg_id}")])
+        keyboard.append([InlineKeyboardButton(get_text("btn_main_menu", lang), callback_data="main_menu")])
+
+        text = (
+            f"🪙 <b>Buy Stars with Crypto</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"Pay with USDT (TRC20) to instantly top-up your Stars balance.\n"
+            f"Bigger pack = more bonus ⭐ free!\n\n"
+            f"<i>Choose a package below:</i>"
+        )
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+
+    elif data.startswith("buy_cryptopkg_"):
+        pkg_id = data.replace("buy_cryptopkg_", "")
+        from config import STAR_PACKAGES, WALLET_ADDRESS
+        pkg = STAR_PACKAGES.get(pkg_id)
+        if not pkg:
+            await query.answer("Package not found.", show_alert=True)
+            return
+            
+        log_interaction(user_id, "buy_star_pkg", detail=pkg_id)
+        
+        # We use a custom state for crypto star packages
+        context.user_data["awaiting_crypto_star_txid"] = pkg_id
+        
+        usd_amount = pkg['usd'].replace("≈ ", "").replace("$", "")
+        
+        text = (
+            f"🪙 <b>Crypto Payment (USDT TRC20)</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"💎 <b>Package:</b> {pkg['name']} ({pkg['stars_credited']} ⭐)\n"
+            f"💵 <b>Amount to Send:</b> ${usd_amount} USDT\n\n"
+            f"🏦 <b>Wallet Address (TRC20):</b>\n"
+            f"<code>{WALLET_ADDRESS}</code>\n\n"
+            f"⚠️ <b>Important:</b>\n"
+            f"1. Send exactly <b>{usd_amount} USDT</b> on the <b>TRC20</b> network.\n"
+            f"2. Wait for the transaction to confirm.\n"
+            f"3. <b>Paste the Transaction ID (TxID / Hash)</b> directly into this chat.\n\n"
+            f"<i>Your stars will be credited as soon as we verify the transaction!</i>"
+        )
+        keyboard = [[InlineKeyboardButton(get_text("btn_main_menu", lang), callback_data="main_menu")]]
+        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+
+    # ── Pay with Crypto (Legacy Plans) ─────────────────────
     elif data.startswith("pay_crypto_"):
         plan_id = data.replace("pay_crypto_", "")
         plan_info = PRICING_PLANS.get(plan_id)
