@@ -1,13 +1,13 @@
 {
   "welcome_text": "<b>Bienvenido a 9-17 🌟</b>\n━━━━━━━━━━━━━━━━━━━━\n\n💎 Videos premium exclusivos de 2025–2026, entregados instantáneamente después del pago.\n\nExplora nuestros planes, mira las demostraciones o revisa tu cuenta a continuación.",
-  "demo_menu_text": "🎬 <b>Ver Videos</b>\n━━━━━━━━━━━━━━━━━━━━\n\n⭐ Tu Saldo: <b>{balance} ⭐</b>\n🎥 Videos Normales Disponibles: {regular_count} (15 ⭐ c/u)\n📺 Videos Medianos Disponibles: {medium_count} (25 ⭐ c/u)\n💎 Videos Premium Disponibles: {premium_count} (49 ⭐ c/u)\n\n📺 <b>Cómo funciona:</b>\n• 🎥 Videos normales cuestan 15 stars cada uno (videos cortos)\n• 📺 Videos medianos cuestan 25 stars cada uno (videos medianos)\n• 💎 Videos premium cuestan 49 stars cada uno (videos largos)\n• Los videos son de nuestra colección premium\n• Selección aleatoria de videos para mayor variedad\n\n¿Listo para ver un video?",
+  "demo_menu_text": "🎬 <b>Ver Videos</b>\n━━━━━━━━━━━━━━━━━━━━\n\n⭐ Tu Saldo: <b>{balance} ⭐</b>\n🎥 Videos Normales Disponibles: {regular_count} (150 ⭐ c/u)\n📺 Videos Medianos Disponibles: {medium_count} (250 ⭐ c/u)\n💎 Videos Premium Disponibles: {premium_count} (490 ⭐ c/u)\n\n📺 <b>Cómo funciona:</b>\n• 🎥 Videos normales cuestan 150 stars cada uno (videos cortos)\n• 📺 Videos medianos cuestan 250 stars cada uno (videos medianos)\n• 💎 Videos premium cuestan 490 stars cada uno (videos largos)\n• Los videos son de nuestra colección premium\n• Selección aleatoria de videos para mayor variedad\n\n¿Listo para ver un video?",
   "demo_insufficient_stars": "❌ <b>Estrellas Insuficientes</b>\n━━━━━━━━━━━━━━━━━━━━\n\nNecesitas <b>{price} ⭐</b> para ver este video.\n⭐ Tu saldo: <b>{balance} Stars</b>\n\n💎 Consigue más Stars con cualquier plan, o gánalas refiriendo amigos.",
   "no_videos_available": "⏳ <b>No hay videos disponibles</b>\n━━━━━━━━━━━━━━━━━━━━\n\nActualmente no hay videos {type} disponibles. ¡Vuelve más tarde!",
   "btn_pricing": "💎 Planes de Precios",
   "btn_demos": "🎬 Ver Videos",
-  "btn_watch_regular": "🎥 Ver Video Normal (15 ⭐)",
-  "btn_watch_medium": "📺 Ver Video Mediano (25 ⭐)",
-  "btn_watch_premium": "💎 Ver Video Premium (49 ⭐)",
+  "btn_watch_regular": "🎥 Ver Video Normal (150 ⭐)",
+  "btn_watch_medium": "📺 Ver Video Mediano (250 ⭐)",
+  "btn_watch_premium": "💎 Ver Video Premium (490 ⭐)",
   "btn_share_friend": "🔗 Compartir con un Amigo",
   "share_msg": "¡Únete a 9-17 para desbloquear videos premium exclusivos de 2025-2026 y gana stars gratis!",
   "btn_profile": "👤 Mi Perfil",
@@ -72,7 +72,7 @@
   
   "payment_confirmed_link": "⭐ <b>¡Pago Confirmado — Bienvenido!</b>\n━━━━━━━━━━━━━━━━━━━━\n\n✅ Tu compra de <b>{plan_name}</b> está verificada.\n\n🔗 <b>Tu Enlace de Invitación Privado:</b>\n{link_url}\n\n<i>⚠️ Este enlace es de un solo uso. No lo compartas.</i>\n<i>🙏 ¡Gracias por tu compra!</i>",
   "payment_confirmed_no_link": "⭐ <b>¡Pago Confirmado!</b>\n\n✅ Tu compra de {plan_name} está registrada.\n\n⚠️ Tuvimos problemas para generar tu enlace automáticamente. Por favor contacta a soporte — tu acceso será entregado en breve.",
-  "referral_reward": "🎉 <b>¡Recompensa por Referido!</b>\n━━━━━━━━━━━━━━━━━━━━\n\n¡Alguien a quien referiste acaba de unirse!\n<b>5 ⭐</b> han sido añadidas a tu saldo.",
+  "referral_reward": "🎉 <b>¡Recompensa por Referido!</b>\n━━━━━━━━━━━━━━━━━━━━\n\n¡Alguien a quien referiste acaba de unirse!\n<b>{stars} ⭐</b> han sido añadidas a tu saldo.",
   "tx_verifying": "🔄 <b>Verificando transacción...</b>\n<i>Esto puede tardar unos segundos.</i>",
   "tx_pending": "⏳ <b>Verificación Pendiente</b>\n\nTu transacción aún no pudo ser verificada automáticamente (podría estar sin confirmar).\nUn administrador la revisará en breve. No necesitas hacer nada más.",
   "tx_failed": "❌ <b>Verificación Fallida</b>\n\nRazón: {reason}\n\nPor favor, revisa tu TxID e inténtalo de nuevo."

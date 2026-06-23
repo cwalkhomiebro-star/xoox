@@ -8,6 +8,7 @@ from config import (
     CHANNEL_ID,
     PRICING_PLANS,
     BOT_USERNAME,
+    REFERRAL_REWARD_STARS,
 )
 from utils.keyboards import get_main_menu_markup, get_buy_stars_button
 from utils.i18n import get_text
@@ -43,6 +44,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Ban gate — silently ignore banned users
     if is_banned(user.id):
+        await update.message.reply_text(get_text("not_authorized", user.language_code or "en"))
         return
 
     referred_by = None
@@ -72,7 +74,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if rewarded_referrer:
         try:
             ref_lang = get_user_language(rewarded_referrer)
-            reward_msg = get_text("referral_reward", ref_lang)
+            reward_msg = get_text("referral_reward", ref_lang).format(stars=REFERRAL_REWARD_STARS)
             await context.bot.send_message(chat_id=rewarded_referrer, text=reward_msg, parse_mode="HTML")
         except Exception as e:
             logger.error(f"Failed to send referral reward to {rewarded_referrer}: {e}")
@@ -106,7 +108,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Tap to copy your link:\n"
         f"<code>{ref_link}</code>\n"
         f"\n"
-        f"Each friend earns you <b>5 ⭐</b>  •  {joined_line}\n"
+        f"Each friend earns you <b>{REFERRAL_REWARD_STARS} ⭐</b>  •  {joined_line}\n"
         f"\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"\n"
@@ -417,11 +419,11 @@ async def admin_demos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "━━━━━━━━━━━━━━━━━━━━\n\n"
         f"👁 <b>Watch Menu Opens:</b> {total_demo_section}\n"
         f"▶️ <b>Total Videos Watched:</b> {total_clicks}\n\n"
-        f"🎥 <b>Regular (15 ⭐):</b> {cat_counts['regular']} watch(es)\n"
+        f"🎥 <b>Regular (150 ⭐):</b> {cat_counts['regular']} watch(es)\n"
         f"<code>{bar(cat_counts['regular'])}</code>\n\n"
-        f"📺 <b>Medium (25 ⭐):</b> {cat_counts['medium']} watch(es)\n"
+        f"📺 <b>Medium (250 ⭐):</b> {cat_counts['medium']} watch(es)\n"
         f"<code>{bar(cat_counts['medium'])}</code>\n\n"
-        f"💎 <b>Premium (49 ⭐):</b> {cat_counts['premium']} watch(es)\n"
+        f"💎 <b>Premium (490 ⭐):</b> {cat_counts['premium']} watch(es)\n"
         f"<code>{bar(cat_counts['premium'])}</code>\n\n"
     )
 
@@ -749,15 +751,15 @@ async def handle_video_upload(update: Update, context: ContextTypes.DEFAULT_TYPE
     # ── Auto-categorize by duration ────────────────────────────────────
     if duration is not None:
         if duration <= 60:
-            video_type, price = "regular", 15
+            video_type, price = "regular", 150
         elif duration <= 120:
-            video_type, price = "medium", 25
+            video_type, price = "medium", 250
         else:
-            video_type, price = "premium", 49
+            video_type, price = "premium", 490
         duration_note = f"🕐 <b>Duration:</b> {duration}s"
     else:
         # Fallback for uncompressed documents with no metadata
-        video_type, price = "regular", 15
+        video_type, price = "regular", 150
         duration_note = "⚠️ Duration unknown — defaulted to <b>Regular</b>"
 
     # ── Auto-assign next slot ───────────────────────────────────────
@@ -798,11 +800,11 @@ async def admin_recategorize(update: Update, context: ContextTypes.DEFAULT_TYPE)
             continue
 
         if duration <= 60:
-            new_type, new_price = "regular", 15
+            new_type, new_price = "regular", 150
         elif duration <= 120:
-            new_type, new_price = "medium", 25
+            new_type, new_price = "medium", 250
         else:
-            new_type, new_price = "premium", 49
+            new_type, new_price = "premium", 490
 
         title = f"{new_type.capitalize()} Video #{v['slot']}"
         set_demo_video(v["slot"], v["file_id"], new_price, title, new_type, duration)

@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import logging
 import os
 import html
@@ -28,6 +29,8 @@ from config import (
     DEMO_LINK_3,
     DEMO_LINK_4,
     BOT_USERNAME,
+    DAILY_STARS,
+    REFERRAL_REWARD_STARS,
 )
 from utils.messages import (
     WELCOME_TEXT,
@@ -57,6 +60,8 @@ from services.user_service import (
     is_banned,
     get_banned_users,
     lookup_user_by_username,
+    get_all_user_ids,
+    credit_daily_stars,
 )
 from services.payment_service import get_payment_instructions
 from services.stars_service import send_stars_invoice, parse_payload
@@ -93,6 +98,30 @@ from handlers.commands import (
 from handlers.messages import handle_text_message
 from handlers.callbacks import handle_callback
 from handlers.payments import pre_checkout_query_handler, successful_payment_handler
+
+
+async def daily_stars_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Runs once per day — credits DAILY_STARS to every non-banned user and notifies them."""
+    user_ids = get_all_user_ids()
+    sent, failed = 0, 0
+    for uid in user_ids:
+        credit_daily_stars(uid, DAILY_STARS)
+        try:
+            await context.bot.send_message(
+                chat_id=uid,
+                text=(
+                    f"🎁 <b>Daily Stars Drop!</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n\n"
+                    f"⭐ <b>{DAILY_STARS} free Stars</b> have just been added to your balance!\n\n"
+                    f"Use them to watch videos — enjoy! 🎬"
+                ),
+                parse_mode="HTML",
+            )
+            sent += 1
+        except Exception:
+            failed += 1
+        await asyncio.sleep(0.05)  # ~20 msg/s — safe under Telegram flood limits
+    logger.info(f"Daily stars job: {DAILY_STARS}⭐ sent to {sent} users ({failed} failed).")
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -171,6 +200,12 @@ def build_application() -> Application:
         raise RuntimeError("TELEGRAM_BOT_TOKEN is not set.")
     ptb_app = ApplicationBuilder().token(TOKEN).updater(None).build()
     _register_handlers(ptb_app)
+    # Schedule daily stars drop (midnight UTC)
+    ptb_app.job_queue.run_daily(
+        daily_stars_job,
+        time=datetime.time(hour=0, minute=0, second=0),
+        name="daily_stars",
+    )
     return ptb_app
 
 
@@ -182,6 +217,12 @@ def main():
         return
     ptb_app = ApplicationBuilder().token(TOKEN).build()
     _register_handlers(ptb_app)
+    # Schedule daily stars drop (midnight UTC)
+    ptb_app.job_queue.run_daily(
+        daily_stars_job,
+        time=datetime.time(hour=0, minute=0, second=0),
+        name="daily_stars",
+    )
     logger.info("Bot started in polling mode...")
     ptb_app.run_polling()
 

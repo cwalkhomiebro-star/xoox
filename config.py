@@ -42,22 +42,6 @@ PRICING_PLANS = {
         "stars_price": 3850,   # ~$50 in Stars
         "description": "1,200+ Videos · 10 VIP Groups · 3 Megalinks · New drops daily (2025–2026)"
     },
-    "starter": {
-        "label": "💎 Elite Starter — $25 | 500+ Videos",
-        "name": "💎 Elite Starter",
-        "price": 25,
-        "original_price": 39,
-        "stars_price": 1925,   # ~$25 in Stars
-        "description": "500+ Ultra HD Videos · 2 VIP Groups · Daily Drops (2025–2026)"
-    },
-    "basic": {
-        "label": "🌟 Basic Access — $5 | 50 Videos",
-        "name": "🌟 Basic Access",
-        "price": 5,
-        "original_price": 10,
-        "stars_price": 385,    # ~$5 in Stars
-        "description": "50 Premium Videos"
-    }
 }
 
 # Demo Links
@@ -83,7 +67,15 @@ BOT_USERNAME = os.getenv("BOT_USERNAME", "YourBotUsername")
 DB_PATH = "bot_database.db"
 
 # Cost in Stars to unlock a single preview
-DEMO_STAR_PRICE = 5
+DEMO_STAR_PRICE = 50
+
+# ── Star Rewards (configurable) ─────────────────────────────────────────────────
+# Stars gifted to every brand-new user on first /start
+WELCOME_STARS = 600          # was 60, x10
+# Stars awarded to a referrer each time one of their invites joins
+REFERRAL_REWARD_STARS = 50   # was 5, x10
+# Stars dropped to every active user once per day
+DAILY_STARS = 5             # configurable daily bonus
 
 # ── Star Top-Up Packages ────────────────────────────────────────────────────────
 # Users pay Telegram Stars → credited to their in-bot balance.

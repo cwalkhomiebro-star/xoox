@@ -16,6 +16,7 @@ from config import (
     DEMO_LINK_4,
     BOT_USERNAME,
     DEMO_STAR_PRICE,
+    REFERRAL_REWARD_STARS,
 )
 from utils.i18n import get_text
 from utils.keyboards import get_main_menu_markup, back_to_main, get_buy_stars_button
@@ -141,7 +142,7 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
             f"Tap to copy your link:\n"
             f"<code>{ref_link}</code>\n"
             f"\n"
-            f"Each friend earns you <b>5 ⭐</b>  •  {joined_line}\n"
+            f"Each friend earns you <b>{REFERRAL_REWARD_STARS} ⭐</b>  •  {joined_line}\n"
             f"\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"\n"
@@ -328,8 +329,8 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
     elif data.startswith("demo_type_"):
         video_type = data.replace("demo_type_", "")
         
-        prices = {"regular": 15, "medium": 25, "premium": 49}
-        price = prices.get(video_type, 15)
+        prices = {"regular": 150, "medium": 250, "premium": 490}
+        price = prices.get(video_type, 150)
 
         from services.demo_service import get_random_video_by_type
         demo = get_random_video_by_type(video_type)
@@ -364,7 +365,7 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
 
         # Build video inline keyboard
         video_keyboard = []
-        all_prices = {"regular": 15, "medium": 25, "premium": 49}
+        all_prices = {"regular": 150, "medium": 250, "premium": 490}
         for v_type, v_price in all_prices.items():
             if new_balance >= v_price:
                 label = f"▶️ Watch Another {v_type.capitalize()}  ·  {v_price} ⭐"
@@ -468,10 +469,10 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
             "🔗 <b>Refer & Earn</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "Share your unique link with friends. Every person who joins through "
-            "your link is counted as your referral and earns you rewards!\n\n"
+            f"your link is counted as your referral and earns you <b>{REFERRAL_REWARD_STARS} ⭐</b>!\n\n"
             f"<b>Your Link:</b>\n{link_display}\n\n"
             f"👥 <b>Total Referrals:</b> {referral_count} friend(s)\n\n"
-            "<i>Rewards are credited automatically once referrals complete a purchase.</i>"
+            "<i>Rewards are credited automatically once referrals start the bot.</i>"
             + BRAND_FOOTER
         )
         try:

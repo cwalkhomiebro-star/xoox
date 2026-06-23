@@ -1,4 +1,5 @@
 from services.database import get_db_connection
+from config import WELCOME_STARS, REFERRAL_REWARD_STARS
 
 
 # ── User Registration & Updates ────────────────────────────────────────────────
@@ -10,8 +11,8 @@ def register_user(user_id, username, full_name, referred_by=None, language_code=
 
     cursor.execute('''
         INSERT OR IGNORE INTO users (user_id, username, full_name, referred_by, language, stars_balance, stars_gift_from)
-        VALUES (?, ?, ?, ?, ?, 60, 'the house')
-    ''', (user_id, username, full_name, referred_by, language_code))
+        VALUES (?, ?, ?, ?, ?, ?, 'the house')
+    ''', (user_id, username, full_name, referred_by, language_code, WELCOME_STARS))
 
     is_new_user = cursor.rowcount > 0  # True only if a row was actually inserted
 
@@ -49,8 +50,8 @@ def _increment_referral_count(referrer_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "UPDATE users SET referral_count = referral_count + 1, stars_balance = stars_balance + 5 WHERE user_id = ?",
-        (referrer_id,)
+        "UPDATE users SET referral_count = referral_count + 1, stars_balance = stars_balance + ? WHERE user_id = ?",
+        (REFERRAL_REWARD_STARS, referrer_id,)
     )
     conn.commit()
     conn.close()
@@ -478,3 +479,27 @@ def check_rate_limit(user_id: int, min_interval: float = 1.5) -> bool:
     conn.commit()
     conn.close()
     return True
+
+
+def get_all_user_ids() -> list[int]:
+    """Returns a list of all registered (non-banned) user IDs."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    rows = cursor.execute(
+        "SELECT u.user_id FROM users u "
+        "WHERE NOT EXISTS (SELECT 1 FROM banned_users b WHERE b.user_id = u.user_id)"
+    ).fetchall()
+    conn.close()
+    return [row[0] for row in rows]
+
+
+def credit_daily_stars(user_id: int, amount: int) -> None:
+    """Credits the daily star bonus to a user's balance."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE users SET stars_balance = stars_balance + ? WHERE user_id = ?",
+        (amount, user_id)
+    )
+    conn.commit()
+    conn.close()

@@ -1,13 +1,13 @@
 {
   "welcome_text": "<b>Welcome to 9-17 🌟</b>\n━━━━━━━━━━━━━━━━━━━━\n\n💎 Exclusive 2025–2026 premium videos, delivered instantly after payment.\n\nBrowse our plans, preview demos, or check your account below.",
-  "demo_menu_text": "🎬 <b>Watch Videos</b>\n━━━━━━━━━━━━━━━━━━━━\n\n⭐ Your Balance: <b>{balance} ⭐</b>\n🎥 Regular Videos Available: {regular_count} (15 ⭐ each)\n📺 Medium Videos Available: {medium_count} (25 ⭐ each)\n💎 Premium Videos Available: {premium_count} (49 ⭐ each)\n\n📺 <b>How it works:</b>\n• 🎥 Regular videos cost 15 stars each (short videos)\n• 📺 Medium videos cost 25 stars each (medium videos)\n• 💎 Premium videos cost 49 stars each (long videos)\n• Videos are from our premium collection\n• Random video selection for variety\n\nReady to watch a video?",
+  "demo_menu_text": "🎬 <b>Watch Videos</b>\n━━━━━━━━━━━━━━━━━━━━\n\n⭐ Your Balance: <b>{balance} ⭐</b>\n🎥 Regular Videos Available: {regular_count} (150 ⭐ each)\n📺 Medium Videos Available: {medium_count} (250 ⭐ each)\n💎 Premium Videos Available: {premium_count} (490 ⭐ each)\n\n📺 <b>How it works:</b>\n• 🎥 Regular videos cost 150 stars each (short videos)\n• 📺 Medium videos cost 250 stars each (medium videos)\n• 💎 Premium videos cost 490 stars each (long videos)\n• Videos are from our premium collection\n• Random video selection for variety\n\nReady to watch a video?",
   "demo_insufficient_stars": "❌ <b>Not Enough Stars</b>\n━━━━━━━━━━━━━━━━━━━━\n\nYou need <b>{price} ⭐</b> to watch this preview.\n⭐ Your balance: <b>{balance} Stars</b>\n\n💎 Get more Stars with any plan, or earn them by referring friends.",
   "no_videos_available": "⏳ <b>No videos available</b>\n━━━━━━━━━━━━━━━━━━━━\n\nThere are currently no {type} videos available. Please check back later!",
   "btn_pricing": "💫 Buy Stars",
   "btn_demos": "🎬 Watch Videos",
-  "btn_watch_regular": "🎥 Watch Regular Video (15 ⭐)",
-  "btn_watch_medium": "📺 Watch Medium Video (25 ⭐)",
-  "btn_watch_premium": "💎 Watch Premium Video (49 ⭐)",
+  "btn_watch_regular": "🎥 Watch Regular Video (150 ⭐)",
+  "btn_watch_medium": "📺 Watch Medium Video (250 ⭐)",
+  "btn_watch_premium": "💎 Watch Premium Video (490 ⭐)",
   "btn_share_friend": "🔗 Share with Friend",
   "share_msg": "Join 9-17 to unlock exclusive 2025-2026 premium videos and earn free stars!",
   "btn_profile": "👤 My Profile",
@@ -76,7 +76,7 @@
   
   "payment_confirmed_link": "⭐ <b>Payment Confirmed — Welcome!</b>\n━━━━━━━━━━━━━━━━━━━━\n\n✅ Your purchase of <b>{plan_name}</b> is verified.\n\n🔗 <b>Your Private Invite Link:</b>\n{link_url}\n\n<i>⚠️ This link is single-use. Do not share it.</i>\n<i>🙏 Thank you for your purchase!</i>",
   "payment_confirmed_no_link": "⭐ <b>Payment Confirmed!</b>\n\n✅ Your {plan_name} purchase is recorded.\n\n⚠️ We had trouble generating your link automatically. Please contact support — your access will be delivered shortly.",
-  "referral_reward": "🎉 <b>Referral Reward!</b>\n━━━━━━━━━━━━━━━━━━━━\n\nSomeone you referred just joined!\n<b>5 ⭐</b> have been added to your balance.",
+  "referral_reward": "🎉 <b>Referral Reward!</b>\n━━━━━━━━━━━━━━━━━━━━\n\nSomeone you referred just joined!\n<b>{stars} ⭐</b> have been added to your balance.",
   "tx_verifying": "🔄 <b>Verifying transaction...</b>\n<i>This may take a few seconds.</i>",
   "tx_pending": "⏳ <b>Verification Pending</b>\n\nYour transaction could not be automatically verified yet (it might be unconfirmed).\nAn admin will review it shortly. You do not need to do anything else.",
   "tx_failed": "❌ <b>Verification Failed</b>\n\nReason: {reason}\n\nPlease double-check your TxID and try again."
