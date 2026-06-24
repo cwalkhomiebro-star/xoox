@@ -48,17 +48,20 @@ async def start_cashier(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = []
     for pkg_id, pkg in STAR_PACKAGES.items():
         bonus_text = f" (+{pkg['bonus']} bonus)" if pkg['bonus'] > 0 else ""
-        label = f"{pkg['name']}:  {pkg['stars_paid']} ⭐ → {pkg['stars_credited']} ⭐{bonus_text}  ·  {pkg['usd']}"
+        crypto_price = pkg.get("crypto_usd", pkg["usd"])
+        label = f"{pkg['name']}:  {pkg['stars_credited']} ⭐{bonus_text}  ·  {crypto_price} USDT  (or {pkg['usd']} in Stars)"
         keyboard.append([InlineKeyboardButton(label, callback_data=f"buy_pkg_{pkg_id}_{target_user_id}")])
 
     text = (
         f"💫 <b>Secure Top-Up Portal</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"Pay with Telegram Stars. Your balance on the main bot will be updated instantly.\n"
+        f"🔥 <b>Pay with Crypto (USDT) and get 30% OFF!</b>\n"
+        f"Or pay with Telegram Stars at full price.\n\n"
         f"Bigger pack = more bonus ⭐ free!\n\n"
         f"<i>Choose a package below:</i>"
     )
     await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+
 
 
 async def handle_cashier_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):

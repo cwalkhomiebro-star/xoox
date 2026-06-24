@@ -193,22 +193,32 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
     # ── Buy Stars with Crypto ──────────────────────────────
     elif data == "buy_crypto_stars":
         log_interaction(user_id, "view_pricing")
-        from config import STAR_PACKAGES
-        keyboard = []
-        for pkg_id, pkg in STAR_PACKAGES.items():
-            bonus_text = f" (+{pkg['bonus']} bonus)" if pkg['bonus'] > 0 else ""
-            label = f"{pkg['name']}: {pkg['stars_credited']} ⭐{bonus_text}  ·  {pkg['usd']}"
-            keyboard.append([InlineKeyboardButton(label, callback_data=f"buy_cryptopkg_{pkg_id}")])
-        keyboard.append([InlineKeyboardButton(get_text("btn_main_menu", lang), callback_data="main_menu")])
+        from config import CASHIER_BOT_USERNAME
+
+        if CASHIER_BOT_USERNAME == "YourCashierBotUsername":
+            await query.answer("❌ Cashier bot not configured.", show_alert=True)
+            return
+
+        cashier_link = f"https://t.me/{CASHIER_BOT_USERNAME}?start=pay_{user_id}"
+
+        keyboard = [
+            [InlineKeyboardButton("🪙 Open Secure Top-Up Portal", url=cashier_link)],
+            [InlineKeyboardButton(get_text("btn_main_menu", lang), callback_data="main_menu")]
+        ]
 
         text = (
             f"🪙 <b>Buy Stars with Crypto</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"Pay with USDT (TRC20) to instantly top-up your Stars balance.\n"
-            f"Bigger pack = more bonus ⭐ free!\n\n"
-            f"<i>Choose a package below:</i>"
+            f"🔥 <b>Crypto Exclusive: 30% OFF all packages!</b>\n"
+            f"Pay with USDT (TRC20) through our secure cashier and save instantly.\n\n"
+            f"Tap the button below — all packages and prices are shown there."
         )
-        await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        try:
+            await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        except Exception:
+            await context.bot.send_message(chat_id=user_id, text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+
+
 
     elif data.startswith("buy_cryptopkg_"):
         pkg_id = data.replace("buy_cryptopkg_", "")
@@ -223,13 +233,14 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
         # We use a custom state for crypto star packages
         context.user_data["awaiting_crypto_star_txid"] = pkg_id
         
-        usd_amount = pkg['usd'].replace("≈ ", "").replace("$", "")
+        crypto_price = pkg.get("crypto_usd", pkg["usd"])
+        usd_amount = crypto_price.replace("≈ ", "").replace("$", "")
         
         text = (
             f"🪙 <b>Crypto Payment (USDT TRC20)</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━\n\n"
             f"💎 <b>Package:</b> {pkg['name']} ({pkg['stars_credited']} ⭐)\n"
-            f"💵 <b>Amount to Send:</b> ${usd_amount} USDT\n\n"
+            f"💵 <b>Amount to Send:</b> ${usd_amount} USDT  <s>{pkg['usd']}</s>  <b>(-30% crypto deal!)</b>\n\n"
             f"🏦 <b>Wallet Address (TRC20):</b>\n"
             f"<code>{WALLET_ADDRESS}</code>\n\n"
             f"⚠️ <b>Important:</b>\n"
@@ -249,7 +260,7 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
             await query.edit_message_text(get_text("plan_not_found", lang), reply_markup=back_to_main(lang))
             return
         log_interaction(user_id, "pay_crypto", detail=plan_id)
-        update_selected_plan(user_id, plan_id)
+        update_selected_plan(user_id, plan_id, "crypto")
         instructions = get_payment_instructions(plan_id, lang)
 
         keyboard = [
@@ -333,7 +344,7 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
         price = prices.get(video_type, 150)
 
         from services.demo_service import get_random_video_by_type
-        demo = get_random_video_by_type(video_type)
+        demo = get_random_video_by_type(video_type, user_id=user_id)
         if not demo:
             msg = get_text("no_videos_available", lang).replace("{type}", video_type)
             await query.answer(msg, show_alert=True)
@@ -420,7 +431,8 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
             is_approved = status.get("is_approved")
             join_date = str(status.get("join_date", "Unknown"))[:10]
             referrals = status.get("referral_count", 0)
-            method = status.get("payment_method", "crypto").capitalize()
+            pm = status.get("payment_method")
+            method = pm.capitalize() if pm else "—"
             text = (
                 "👤 <b>My Account</b>\n"
                 "━━━━━━━━━━━━━━━━━━━━\n\n"

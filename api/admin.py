@@ -208,7 +208,15 @@ def api_users():
 
     base_cols = (
         "user_id, username, full_name, payment_status, is_approved, "
-        "join_date, last_seen, selected_plan, stars_balance, payment_method"
+        "join_date, last_seen, selected_plan, stars_balance, payment_method, "
+        "(SELECT COUNT(*) FROM interactions WHERE user_id = users.user_id AND action = 'view_demo' AND detail LIKE '%_regular') AS count_regular, "
+        "(SELECT COUNT(*) FROM interactions WHERE user_id = users.user_id AND action = 'view_demo' AND detail LIKE '%_medium') AS count_medium, "
+        "(SELECT COUNT(*) FROM interactions WHERE user_id = users.user_id AND action = 'view_demo' AND detail LIKE '%_premium') AS count_premium, "
+        "COALESCE((SELECT SUM(CASE "
+        "  WHEN detail LIKE '%_regular' THEN (CASE WHEN created_at < '2026-06-23 22:31:12' THEN 15 ELSE 150 END) "
+        "  WHEN detail LIKE '%_medium'  THEN (CASE WHEN created_at < '2026-06-23 22:31:12' THEN 25 ELSE 250 END) "
+        "  WHEN detail LIKE '%_premium' THEN (CASE WHEN created_at < '2026-06-23 22:31:12' THEN 49 ELSE 490 END) "
+        "  ELSE 0 END) FROM interactions WHERE user_id = users.user_id AND action = 'view_demo'), 0) AS stars_spent"
     )
     if search:
         like = f"%{search}%"
@@ -232,7 +240,16 @@ def api_users():
 
     conn.close()
     pages = max(1, -(-total // page_size))
-    return jsonify({"users": [dict(r) for r in rows], "total": total, "pages": pages, "page": page})
+    
+    users_list = []
+    for r in rows:
+        d = dict(r)
+        d["count_regular"] = d.get("count_regular") or 0
+        d["count_medium"] = d.get("count_medium") or 0
+        d["count_premium"] = d.get("count_premium") or 0
+        users_list.append(d)
+        
+    return jsonify({"users": users_list, "total": total, "pages": pages, "page": page})
 
 
 # ── Data: Buyers ───────────────────────────────────────────────────────────────
@@ -246,18 +263,72 @@ def api_buyers():
 
     conn   = get_db_connection()
     cursor = conn.cursor()
+
     rows = cursor.execute(
-        "SELECT p.purchase_id, p.user_id, u.username, u.full_name, "
-        "p.plan_id, p.payment_method, p.telegram_charge_id, p.created_at "
-        "FROM purchases p LEFT JOIN users u ON p.user_id = u.user_id "
-        "ORDER BY p.created_at DESC LIMIT ? OFFSET ?",
+        """
+        SELECT
+            p.purchase_id,
+            p.user_id,
+            u.username,
+            u.full_name,
+            p.plan_id,
+            p.payment_method,
+            p.telegram_charge_id,
+            p.created_at
+        FROM purchases p
+        LEFT JOIN users u ON p.user_id = u.user_id
+        ORDER BY p.created_at DESC
+        LIMIT ? OFFSET ?
+        """,
         (page_size, offset)
     ).fetchall()
+
     total = cursor.execute("SELECT COUNT(*) FROM purchases").fetchone()[0]
+
     conn.close()
 
     pages = max(1, -(-total // page_size))
     return jsonify({"buyers": [dict(r) for r in rows], "total": total, "pages": pages, "page": page})
+
+
+# ── Data: Referrers ─────────────────────────────────────────────────────────────
+
+@app.route("/api/admin/referrers")
+@_api_auth
+def api_referrers():
+    page      = max(1, int(request.args.get("page", 1)))
+    search    = request.args.get("search", "").strip()
+    page_size = 20
+    offset    = (page - 1) * page_size
+
+    conn   = get_db_connection()
+    cursor = conn.cursor()
+
+    if search:
+        like = f"%{search}%"
+        rows = cursor.execute(
+            "SELECT user_id, username, full_name, referral_count FROM users "
+            "WHERE referral_count > 0 AND (username LIKE ? OR full_name LIKE ? OR CAST(user_id AS TEXT) LIKE ?) "
+            "ORDER BY referral_count DESC LIMIT ? OFFSET ?",
+            (like, like, like, page_size, offset)
+        ).fetchall()
+        total = cursor.execute(
+            "SELECT COUNT(*) FROM users "
+            "WHERE referral_count > 0 AND (username LIKE ? OR full_name LIKE ? OR CAST(user_id AS TEXT) LIKE ?)",
+            (like, like, like)
+        ).fetchone()[0]
+    else:
+        rows = cursor.execute(
+            "SELECT user_id, username, full_name, referral_count FROM users "
+            "WHERE referral_count > 0 "
+            "ORDER BY referral_count DESC LIMIT ? OFFSET ?",
+            (page_size, offset)
+        ).fetchall()
+        total = cursor.execute("SELECT COUNT(*) FROM users WHERE referral_count > 0").fetchone()[0]
+
+    conn.close()
+    pages = max(1, -(-total // page_size))
+    return jsonify({"referrers": [dict(r) for r in rows], "total": total, "pages": pages, "page": page})
 
 
 # ── Data: Pending ──────────────────────────────────────────────────────────────

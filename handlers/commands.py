@@ -9,6 +9,7 @@ from config import (
     PRICING_PLANS,
     BOT_USERNAME,
     REFERRAL_REWARD_STARS,
+    STAR_PACKAGES,
 )
 from utils.keyboards import get_main_menu_markup, get_buy_stars_button
 from utils.i18n import get_text
@@ -34,6 +35,7 @@ from services.user_service import (
     get_user_language,
     get_user_dashboard_data,
     admin_gift_stars,
+    record_package_purchase,
 )
 
 logger = logging.getLogger(__name__)
@@ -652,8 +654,19 @@ async def admin_giftstars(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ Amount must be a positive number.")
             return
 
-        success = admin_gift_stars(user_id, amount, source="the house")
+        # Check if the gift amount matches a star package's stars_credited
+        matched_pkg = None
+        for pkg_id, pkg in STAR_PACKAGES.items():
+            if pkg["stars_credited"] == amount:
+                matched_pkg = pkg_id
+                break
+
+        success = admin_gift_stars(user_id, amount, source="crypto" if matched_pkg else "the house")
         if success:
+            if matched_pkg:
+                # Log as a crypto star package purchase in the purchases table!
+                record_package_purchase(user_id, matched_pkg, "crypto", charge_id="Manual Approval")
+
             # Notify the user
             try:
                 await context.bot.send_message(

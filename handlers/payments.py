@@ -9,7 +9,7 @@ from config import (
     STAR_PACKAGES,
 )
 
-from services.user_service import log_interaction, get_user_language, record_stars_purchase, admin_gift_stars
+from services.user_service import log_interaction, get_user_language, record_stars_purchase, admin_gift_stars, record_package_purchase
 from services.stars_service import parse_payload
 from utils.i18n import get_text
 
@@ -65,6 +65,7 @@ async def successful_payment_handler(update: Update, context: ContextTypes.DEFAU
 
         admin_gift_stars(user_id, credited, source=f"purchase_{plan_id}")
         log_interaction(user_id, "stars_topup", detail=f"{plan_id}:{credited}")
+        record_package_purchase(user_id, plan_id, 'stars', charge_id)
 
         logger.info(
             f"Star top-up complete: user={user_id}, pkg='{plan_id}', "

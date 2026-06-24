@@ -56,15 +56,22 @@ def _increment_referral_count(referrer_id):
     conn.commit()
     conn.close()
 
-def update_selected_plan(user_id, plan_id):
+def update_selected_plan(user_id, plan_id, payment_method=None):
     """Updates the user's selected plan in the database."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('''
-        UPDATE users
-        SET selected_plan = ?, payment_status = 'pending'
-        WHERE user_id = ?
-    ''', (plan_id, user_id))
+    if payment_method:
+        cursor.execute('''
+            UPDATE users
+            SET selected_plan = ?, payment_status = 'pending', payment_method = ?
+            WHERE user_id = ?
+        ''', (plan_id, payment_method, user_id))
+    else:
+        cursor.execute('''
+            UPDATE users
+            SET selected_plan = ?, payment_status = 'pending'
+            WHERE user_id = ?
+        ''', (plan_id, user_id))
     conn.commit()
     conn.close()
 
@@ -218,9 +225,9 @@ def get_stats():
     ).fetchall()
     stats['plan_breakdown'] = {row[0]: row[1] for row in rows if row[0]}
 
-    # Top referrers
+    # Top referrers (overview/Telegram stats show only top 5, dedicated tab shows all paginated)
     rows = cursor.execute(
-        "SELECT user_id, username, referral_count FROM users WHERE referral_count > 0 ORDER BY referral_count DESC LIMIT 5"
+        "SELECT user_id, username, full_name, referral_count FROM users WHERE referral_count > 0 ORDER BY referral_count DESC LIMIT 5"
     ).fetchall()
     stats['top_referrers'] = [dict(row) for row in rows]
 
@@ -259,23 +266,30 @@ def get_interaction_stats():
 
 def approve_user_payment(user_id):
     """
-    Marks a user's payment as approved.
+    Marks a user's payment as approved and inserts the purchase into the purchases table.
     Returns (newly_approved, referred_by)
     """
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT is_approved, referred_by FROM users WHERE user_id = ?", (user_id,))
+    cursor.execute("SELECT is_approved, referred_by, selected_plan, payment_method FROM users WHERE user_id = ?", (user_id,))
     row = cursor.fetchone()
     if not row:
         conn.close()
         return False, None
     was_approved = bool(row['is_approved'])
     referred_by = row['referred_by']
+    plan_id = row['selected_plan']
+    pm = row['payment_method'] or 'crypto'
 
     cursor.execute(
-        "UPDATE users SET payment_status = 'approved', is_approved = 1 WHERE user_id = ?",
-        (user_id,)
+        "UPDATE users SET payment_status = 'approved', is_approved = 1, payment_method = ? WHERE user_id = ?",
+        (pm, user_id)
     )
+    if plan_id:
+        cursor.execute(
+            "INSERT OR IGNORE INTO purchases (user_id, plan_id, payment_method, telegram_charge_id) VALUES (?, ?, ?, 'Manual Approval')",
+            (user_id, plan_id, pm)
+        )
     conn.commit()
     conn.close()
     return not was_approved, referred_by
@@ -305,6 +319,24 @@ def has_active_purchase(user_id: int, plan_id: str) -> bool:
     result = cursor.fetchone()
     conn.close()
     return result is not None
+
+
+def record_package_purchase(user_id: int, pkg_id: str, payment_method: str, charge_id: str = None) -> None:
+    """
+    Records a completed Star Package purchase in the purchases table.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        '''
+        INSERT OR IGNORE INTO purchases (user_id, plan_id, payment_method, telegram_charge_id)
+        VALUES (?, ?, ?, ?)
+        ''',
+        (user_id, pkg_id, payment_method, charge_id)
+    )
+    conn.commit()
+    conn.close()
+
 
 def record_stars_purchase(user_id: int, plan_id: str, telegram_charge_id: str) -> tuple[bool, int]:
     """

@@ -3,14 +3,22 @@
   "builds": [
     { "src": "api/webhook.py",         "use": "@vercel/python" },
     { "src": "api/cashier_webhook.py", "use": "@vercel/python" },
-    { "src": "api/admin.py",           "use": "@vercel/python" }
+    { "src": "api/admin.py",           "use": "@vercel/python" },
+    { "src": "api/daily_stars.py",     "use": "@vercel/python" }
   ],
   "routes": [
     { "src": "/api/webhook",           "dest": "/api/webhook.py" },
     { "src": "/api/cashier",           "dest": "/api/cashier_webhook.py" },
+    { "src": "/api/daily_stars",       "dest": "/api/daily_stars.py" },
     { "src": "/api/admin/(.*)",        "dest": "/api/admin.py" },
     { "src": "/admin(.*)",             "dest": "/api/admin.py" },
     { "src": "/health",                "dest": "/api/webhook.py" },
     { "src": "/",                      "dest": "/api/webhook.py" }
+  ],
+  "crons": [
+    {
+      "path": "/api/daily_stars",
+      "schedule": "0 0 * * *"
+    }
   ]
 }

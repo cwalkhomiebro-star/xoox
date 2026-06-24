@@ -211,6 +211,9 @@ tr:hover td{background:rgba(255,255,255,.018)}
     <button class="nav-item" onclick="switchTab('buyers',this)">
       <span>💰</span> Buyers
     </button>
+    <button class="nav-item" onclick="switchTab('referrers',this)">
+      <span>🔗</span> Referrers
+    </button>
     <button class="nav-item" id="nav-pending" onclick="switchTab('pending',this)">
       <span>⏳</span> Pending
       <span class="nav-badge zero" id="pending-badge">0</span>
@@ -265,6 +268,18 @@ tr:hover td{background:rgba(255,255,255,.018)}
       </div>
     </div>
 
+    <!-- Referrers -->
+    <div class="tab-panel" id="tab-referrers">
+      <div class="tbl-wrap">
+        <div class="tbl-head">
+          <h3>All Referrers</h3>
+          <input class="search-box" id="referrers-search" placeholder="🔍  Search ID, @username, name…" oninput="referrersSearchDebounce()">
+        </div>
+        <div id="referrers-body"></div>
+        <div class="pagination" id="referrers-pager"></div>
+      </div>
+    </div>
+
     <!-- Pending -->
     <div class="tab-panel" id="tab-pending">
       <div class="tbl-wrap">
@@ -299,10 +314,10 @@ tr:hover td{background:rgba(255,255,255,.018)}
 
 <script>
 // ── State ──────────────────────────────────────────────────────────────────────
-var usersPage = 1, buyersPage = 1, usersSearch = '', searchTimer, funnelChart;
+var usersPage = 1, buyersPage = 1, referrersPage = 1, usersSearch = '', referrersSearch = '', searchTimer, funnelChart;
 
 const TAB_TITLES = {
-  overview:'📊 Overview', users:'👥 Users', buyers:'💰 Buyers',
+  overview:'📊 Overview', users:'👥 Users', buyers:'💰 Buyers', referrers:'🔗 Referrers',
   pending:'⏳ Pending', banned:'🚫 Banned', videos:'🎬 Videos'
 };
 
@@ -328,7 +343,8 @@ function badge(status) {
 }
 
 function methodBadge(m) {
-  var s = m || 'crypto';
+  if (!m) return '—';
+  var s = m;
   return '<span class="bdg bdg-' + s + '">' + s.toUpperCase() + '</span>';
 }
 
@@ -365,6 +381,7 @@ function switchTab(name, btn) {
   if (name === 'overview') loadOverview();
   else if (name === 'users') { usersPage = 1; loadUsers(); }
   else if (name === 'buyers') { buyersPage = 1; loadBuyers(); }
+  else if (name === 'referrers') { referrersPage = 1; loadReferrers(); }
   else if (name === 'pending') loadPending();
   else if (name === 'banned') loadBanned();
   else if (name === 'videos') loadVideos();
@@ -472,12 +489,20 @@ async function loadUsers() {
   if (!d.users || d.users.length === 0) { setEmpty('users-body', 'No users found.'); return; }
 
   var rows = d.users.map(function(u){
+    var videoViews =
+      '<span style="color:var(--muted);font-size:11px">' +
+      '🎥 ' + (u.count_regular || 0) +
+      ' &nbsp;📺 ' + (u.count_medium || 0) +
+      ' &nbsp;💎 ' + (u.count_premium || 0) +
+      '</span>';
     return '<tr><td><span class="mono">' + u.user_id + '</span></td>' +
       '<td>' + (u.username ? '@' + u.username : '—') + '</td>' +
       '<td>' + (u.full_name || '—') + '</td>' +
       '<td>' + badge(u.payment_status) + '</td>' +
       '<td>' + cap(u.selected_plan || '—') + '</td>' +
       '<td>⭐ ' + fmtNum(u.stars_balance) + '</td>' +
+      '<td style="color:var(--danger)">🔥 ' + fmtNum(u.stars_spent || 0) + '</td>' +
+      '<td>' + videoViews + '</td>' +
       '<td>' + methodBadge(u.payment_method) + '</td>' +
       '<td style="color:var(--muted)">' + fmtDate(u.join_date) + '</td>' +
       '<td style="color:var(--muted)">' + fmtDate(u.last_seen) + '</td></tr>';
@@ -485,7 +510,7 @@ async function loadUsers() {
 
   document.getElementById('users-body').innerHTML =
     '<table><thead><tr><th>ID</th><th>Username</th><th>Name</th><th>Status</th>' +
-    '<th>Plan</th><th>Stars</th><th>Method</th><th>Joined</th><th>Last Seen</th></tr></thead>' +
+    '<th>Plan</th><th>⭐ Balance</th><th>🔥 Spent</th><th>📹 Videos</th><th>Method</th><th>Joined</th><th>Last Seen</th></tr></thead>' +
     '<tbody>' + rows + '</tbody></table>';
 
   pager('users-pager', d.page, d.pages, 'usersPrev', 'usersNext');
@@ -522,6 +547,40 @@ async function loadBuyers() {
 }
 function buyersNext() { buyersPage++; loadBuyers(); }
 function buyersPrev() { buyersPage--; loadBuyers(); }
+
+// ── Referrers ──────────────────────────────────────────────────────────────────
+function referrersSearchDebounce() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(function(){
+    referrersSearch = document.getElementById('referrers-search').value;
+    referrersPage = 1;
+    loadReferrers();
+  }, 350);
+}
+
+async function loadReferrers() {
+  setLoading('referrers-body');
+  var url = '/api/admin/referrers?page=' + referrersPage + '&search=' + encodeURIComponent(referrersSearch);
+  var d = await fetch(url).then(function(r){ return r.json(); });
+  document.getElementById('topbar-meta').textContent = fmtNum(d.total) + ' referrers';
+
+  if (!d.referrers || d.referrers.length === 0) { setEmpty('referrers-body', 'No referrers found.'); return; }
+
+  var rows = d.referrers.map(function(r){
+    return '<tr><td><span class="mono">' + r.user_id + '</span></td>' +
+      '<td>' + (r.username ? '@' + r.username : '—') + '</td>' +
+      '<td>' + (r.full_name || '—') + '</td>' +
+      '<td>⭐ ' + fmtNum(r.referral_count) + '</td></tr>';
+  }).join('');
+
+  document.getElementById('referrers-body').innerHTML =
+    '<table><thead><tr><th>User ID</th><th>Username</th><th>Name</th><th>Referrals</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table>';
+
+  pager('referrers-pager', d.page, d.pages, 'referrersPrev', 'referrersNext');
+}
+function referrersNext() { referrersPage++; loadReferrers(); }
+function referrersPrev() { referrersPage--; loadReferrers(); }
 
 // ── Pending ────────────────────────────────────────────────────────────────────
 async function loadPending() {

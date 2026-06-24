@@ -80,33 +80,38 @@ DAILY_STARS = 5             # configurable daily bonus
 # ── Star Top-Up Packages ────────────────────────────────────────────────────────
 # Users pay Telegram Stars → credited to their in-bot balance.
 # 1 Telegram Star ≈ $0.013 USD  →  $1 ≈ 77 Stars
+# crypto_usd = usd price with 30% discount (for USDT crypto payment path)
 STAR_PACKAGES = {
     "starter": {
         "name":            "🥉 Starter",
-        "stars_paid":      6150,   # ~$80
-        "stars_credited":  7000,   # +850 bonus
+        "stars_paid":      6150,    # ~$80
+        "stars_credited":  7000,    # +850 bonus
         "bonus":           850,
         "usd":             "$80",
+        "crypto_usd":      "$56",   # $80 - 30%
     },
     "pro": {
         "name":            "🥈 Pro",
-        "stars_paid":      11550,  # ~$150
-        "stars_credited":  13500,  # +1950 bonus
-        "bonus":           1950,
-        "usd":             "$150",
+        "stars_paid":      12320,   # ~$160
+        "stars_credited":  14000,   # +1680 bonus
+        "bonus":           1680,
+        "usd":             "$160",
+        "crypto_usd":      "$112",  # $160 - 30%
     },
     "premium": {
         "name":            "🥇 Premium",
-        "stars_paid":      23000,  # ~$299
-        "stars_credited":  28000,  # +5000 bonus
-        "bonus":           5000,
-        "usd":             "$299",
+        "stars_paid":      26950,   # ~$350
+        "stars_credited":  32000,   # +5050 bonus
+        "bonus":           5050,
+        "usd":             "$350",
+        "crypto_usd":      "$245",  # $350 - 30%
     },
     "elite": {
         "name":            "💎 Elite",
-        "stars_paid":      38400,  # ~$499
-        "stars_credited":  50000,  # +11600 bonus
-        "bonus":           11600,
-        "usd":             "$499",
+        "stars_paid":      46150,   # ~$599
+        "stars_credited":  58000,   # +11850 bonus
+        "bonus":           11850,
+        "usd":             "$599",
+        "crypto_usd":      "$419",  # $599 - 30%
     },
 }

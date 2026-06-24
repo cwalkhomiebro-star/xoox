@@ -115,7 +115,7 @@ def init_db():
             full_name TEXT,
             selected_plan TEXT,
             payment_status TEXT DEFAULT 'none',
-            payment_method TEXT DEFAULT 'crypto',
+            payment_method TEXT DEFAULT NULL,
             join_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             is_approved INTEGER DEFAULT 0,
@@ -183,6 +183,17 @@ def init_db():
 
     _migrate(cursor)
     conn.commit()
+    _migrate_existing_purchases(conn)
+
+    # Clean up payment_method for users who got welcome stars and never paid (meaning is_approved = 0 and no purchases)
+    cursor.execute("""
+        UPDATE users 
+        SET payment_method = NULL 
+        WHERE is_approved = 0 
+          AND payment_method = 'crypto'
+          AND user_id NOT IN (SELECT DISTINCT user_id FROM purchases)
+    """)
+    conn.commit()
     conn.close()
 
 
@@ -192,7 +203,7 @@ def _migrate(cursor):
     user_migrations = [
         ("referred_by",     "INTEGER DEFAULT NULL"),
         ("referral_count",  "INTEGER DEFAULT 0"),
-        ("payment_method",  "TEXT DEFAULT 'crypto'"),
+        ("payment_method",  "TEXT DEFAULT NULL"),
         ("last_seen",       "TIMESTAMP"),
         ("language",        "TEXT DEFAULT NULL"),
         ("stars_balance",   "INTEGER DEFAULT 0"),
@@ -210,3 +221,44 @@ def _migrate(cursor):
     for col, definition in demo_migrations:
         if col not in existing_demos:
             cursor.execute(f"ALTER TABLE demo_videos ADD COLUMN {col} {definition}")
+
+
+def _migrate_existing_purchases(conn):
+    """Retroactively populates the purchases table with star top-ups and manual approved users."""
+    cursor = conn.cursor()
+
+    # 1. Migrate star package top-ups from interactions
+    rows = cursor.execute(
+        "SELECT user_id, detail, created_at FROM interactions WHERE action = 'stars_topup'"
+    ).fetchall()
+
+    for row in rows:
+        user_id = row[0]
+        detail = row[1]
+        created_at = row[2]
+        plan_id = detail.split(':')[0] if (detail and ':' in detail) else (detail or 'starter')
+        # Per-user unique synthetic charge ID prevents UNIQUE constraint violation
+        synthetic_id = f"migrated-topup-{user_id}-{plan_id}"
+        cursor.execute(
+            "INSERT OR IGNORE INTO purchases (user_id, plan_id, payment_method, telegram_charge_id, created_at) "
+            "VALUES (?, ?, 'stars', ?, ?)",
+            (user_id, plan_id, synthetic_id, created_at)
+        )
+
+    # 2. Migrate manual approvals (users where is_approved = 1) to purchases
+    approved_users = cursor.execute(
+        "SELECT user_id, selected_plan, payment_method, join_date FROM users WHERE is_approved = 1"
+    ).fetchall()
+
+    for u in approved_users:
+        user_id = u[0]
+        plan_id = u[1]
+        pm = u[2] or 'crypto'
+        join_date = u[3]
+        if plan_id:
+            synthetic_id = f"manual-{user_id}-{plan_id}"
+            cursor.execute(
+                "INSERT OR IGNORE INTO purchases (user_id, plan_id, payment_method, telegram_charge_id, created_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (user_id, plan_id, pm, synthetic_id, join_date)
+            )

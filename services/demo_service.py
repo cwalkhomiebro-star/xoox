@@ -56,12 +56,31 @@ def get_next_slot() -> int:
     return max_slot + 1
 
 
-def get_random_video_by_type(video_type: str) -> dict | None:
-    """Return a random demo video for a given type."""
+def get_random_video_by_type(video_type: str, user_id: int = None) -> dict | None:
+    """Return a random demo video for a given type, ensuring no repetition until all are viewed."""
     conn = get_db_connection()
-    row = conn.execute(
-        "SELECT * FROM demo_videos WHERE video_type = ? ORDER BY RANDOM() LIMIT 1", (video_type,)
-    ).fetchone()
+    row = None
+    
+    if user_id is not None:
+        row = conn.execute(
+            '''
+            SELECT * FROM demo_videos 
+            WHERE video_type = ? 
+              AND 'demo_' || slot || '_' || video_type NOT IN (
+                  SELECT detail FROM interactions 
+                  WHERE user_id = ? AND action = 'view_demo'
+              )
+            ORDER BY RANDOM() LIMIT 1
+            ''',
+            (video_type, user_id)
+        ).fetchone()
+
+    if not row:
+        row = conn.execute(
+            "SELECT * FROM demo_videos WHERE video_type = ? ORDER BY RANDOM() LIMIT 1",
+            (video_type,)
+        ).fetchone()
+        
     conn.close()
     return dict(row) if row else None
 
