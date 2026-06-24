@@ -79,34 +79,34 @@ DAILY_STARS = 5             # configurable daily bonus
 
 # ── Star Top-Up Packages ────────────────────────────────────────────────────────
 # Users pay Telegram Stars → credited to their in-bot balance.
-# Values are DOUBLED from original image. USD shown at ~$0.02/star (50 Stars = $1).
+# 1 Telegram Star ≈ $0.013 USD  →  $1 ≈ 77 Stars
 STAR_PACKAGES = {
-    "medium": {
-        "name":            "🥈 Medium",
-        "stars_paid":      240,
-        "stars_credited":  300,    # +60 bonus
-        "bonus":           60,
-        "usd":             "≈ $5",
+    "starter": {
+        "name":            "🥉 Starter",
+        "stars_paid":      6150,   # ~$80
+        "stars_credited":  7000,   # +850 bonus
+        "bonus":           850,
+        "usd":             "$80",
     },
-    "large": {
-        "name":            "🥇 Large",
-        "stars_paid":      600,
-        "stars_credited":  760,    # +160 bonus
-        "bonus":           160,
-        "usd":             "≈ $12",
+    "pro": {
+        "name":            "🥈 Pro",
+        "stars_paid":      11550,  # ~$150
+        "stars_credited":  13500,  # +1950 bonus
+        "bonus":           1950,
+        "usd":             "$150",
     },
     "premium": {
-        "name":            "💎 Premium",
-        "stars_paid":      2000,
-        "stars_credited":  2400,   # +400 bonus
-        "bonus":           400,
-        "usd":             "≈ $40",
+        "name":            "🥇 Premium",
+        "stars_paid":      23000,  # ~$299
+        "stars_credited":  28000,  # +5000 bonus
+        "bonus":           5000,
+        "usd":             "$299",
     },
-    "full_access": {
-        "name":            "🚀 Full Access",
-        "stars_paid":      4950,
-        "stars_credited":  10000,   # Massive bonus for $99
-        "bonus":           5050,
-        "usd":             "≈ $99",
+    "elite": {
+        "name":            "💎 Elite",
+        "stars_paid":      38400,  # ~$499
+        "stars_credited":  50000,  # +11600 bonus
+        "bonus":           11600,
+        "usd":             "$499",
     },
 }
