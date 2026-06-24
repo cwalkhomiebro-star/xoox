@@ -199,7 +199,7 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
             await query.answer("❌ Cashier bot not configured.", show_alert=True)
             return
 
-        cashier_link = f"https://t.me/{CASHIER_BOT_USERNAME}?start=pay_{user_id}"
+        cashier_link = f"https://t.me/{CASHIER_BOT_USERNAME}?start=pay_{user_id}_crypto"
 
         keyboard = [
             [InlineKeyboardButton("🪙 Open Secure Top-Up Portal", url=cashier_link)],
@@ -553,34 +553,7 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
             text, reply_markup=InlineKeyboardMarkup(back_keyboard), parse_mode="HTML"
         )
 
-    # ── Testimonials / Social Proof ────────────────────────
-    elif data == "view_testimonials":
-        log_interaction(user_id, "view_testimonials")
-        testimonials_text = (
-            "⭐ <b>What Our Members Say</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "💬 <i>\"Joined the Pro plan last month — the daily drops are insane. "
-            "Worth every star.\"</i>\n"
-            "— @mike_d ✅ <b>Verified Buyer</b>\n\n"
-            "💬 <i>\"Got the Global Access pack. 15k+ videos and still growing. This is the real deal.\"</i>\n"
-            "— @sarah_k ✅ <b>Verified Buyer</b>\n\n"
-            "💬 <i>\"Fastest delivery I've ever seen — invite link landed in seconds after Stars payment.\"</i>\n"
-            "— @ryu_99 ✅ <b>Verified Buyer</b>\n\n"
-            "💬 <i>\"The Ultra HD quality is on another level. No more sketchy sites.\"</i>\n"
-            "— @nadia_v ✅ <b>Verified Buyer</b>\n\n"
-            "💬 <i>\"Support was quick when I needed help. Top-tier service.\"</i>\n"
-            "— @james_o ✅ <b>Verified Buyer</b>"
-            + BRAND_FOOTER
-        )
-        keyboard = [
-            [get_buy_stars_button(lang, user_id, text="💎 Get Full Access")],
-            [InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]
-        ]
-        await query.edit_message_text(
-            testimonials_text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="HTML"
-        )
+
 
 async def send_nudge(context: ContextTypes.DEFAULT_TYPE):
     """Background task: Follow up with a user who viewed a plan 24h ago but didn't buy."""
