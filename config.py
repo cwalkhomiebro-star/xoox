@@ -84,33 +84,33 @@ DAILY_STARS = 5             # configurable daily bonus
 STAR_PACKAGES = {
     "starter": {
         "name":            "🥉 Starter",
-        "stars_paid":      2050,    # 1/3 of original
-        "stars_credited":  2330,    # 1/3 of original
-        "bonus":           280,     # 1/3 of original
+        "stars_paid":      3500,    # Scaled by 1.7
+        "stars_credited":  4000,    # Scaled by 1.7 (3500 base + 500 bonus)
+        "bonus":           500,     # Scaled by 1.7
         "usd":             "$80",
         "crypto_usd":      "$80",   # Full price
     },
     "pro": {
         "name":            "🥈 Pro",
-        "stars_paid":      4100,    # 1/3 of original
-        "stars_credited":  4660,    # 1/3 of original
-        "bonus":           560,     # 1/3 of original
+        "stars_paid":      7000,    # Scaled by 1.7
+        "stars_credited":  8000,    # Scaled by 1.7 (7000 base + 1000 bonus)
+        "bonus":           1000,    # Scaled by 1.7
         "usd":             "$160",
         "crypto_usd":      "$160",  # Full price
     },
     "premium": {
         "name":            "🥇 Premium",
-        "stars_paid":      8980,    # 1/3 of original
-        "stars_credited":  10660,   # 1/3 of original
-        "bonus":           1680,    # 1/3 of original
+        "stars_paid":      15300,   # Scaled by 1.7
+        "stars_credited":  18200,   # Scaled by 1.7 (15300 base + 2900 bonus)
+        "bonus":           2900,    # Scaled by 1.7
         "usd":             "$350",
         "crypto_usd":      "$350",  # Full price
     },
     "elite": {
         "name":            "💎 Elite",
-        "stars_paid":      15380,   # 1/3 of original
-        "stars_credited":  19330,   # 1/3 of original
-        "bonus":           3950,    # 1/3 of original
+        "stars_paid":      26150,   # Scaled by 1.7
+        "stars_credited":  32900,   # Scaled by 1.7 (26150 base + 6750 bonus)
+        "bonus":           6750,    # Scaled by 1.7
         "usd":             "$599",
         "crypto_usd":      "$599",  # Full price
     },
