@@ -21,15 +21,28 @@ async def pre_checkout_query_handler(update: Update, context: ContextTypes.DEFAU
     Answer OK to allow the payment to proceed.
     """
     query = update.pre_checkout_query
+
+    # Detailed logging to debug PROVIDER_ACCOUNT_INVALID and similar errors
+    logger.info(
+        f"pre_checkout_query received: "
+        f"id={query.id}, "
+        f"user={query.from_user.id}, "
+        f"currency={query.currency}, "
+        f"total={query.total_amount}, "
+        f"payload='{query.invoice_payload}'"
+    )
+
     plan_id, user_id = parse_payload(query.invoice_payload)
 
     if plan_id is None:
-        logger.warning(f"pre_checkout_query: invalid payload '{query.invoice_payload}'")
+        logger.warning(f"pre_checkout_query: invalid payload '{query.invoice_payload}' from user {query.from_user.id}")
         await query.answer(ok=False, error_message="Invalid order. Please try again.")
         return
 
     await query.answer(ok=True)
     logger.info(f"pre_checkout_query answered OK for user {user_id}, plan '{plan_id}'")
+
+
 
 
 async def successful_payment_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
