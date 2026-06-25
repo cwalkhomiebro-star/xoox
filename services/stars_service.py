@@ -2,7 +2,8 @@
 stars_service.py
 ────────────────
 Handles all Telegram Stars (XTR) payment logic.
-Stars use Telegram's native Payments API with provider_token="" (empty).
+Stars use Telegram's native Payments API — provider_token must be OMITTED entirely.
+Passing provider_token="" causes PROVIDER_ACCOUNT_INVALID on all clients.
 """
 
 from config import PRICING_PLANS, STAR_PACKAGES
@@ -47,7 +48,8 @@ async def send_stars_invoice(bot, chat_id: int, plan_id: str, user_id: int) -> N
         title=plan["name"],
         description=plan["description"],
         payload=payload,
-        provider_token="",
+        # NOTE: provider_token must be completely OMITTED for Telegram Stars (XTR).
+        # Passing provider_token="" triggers PROVIDER_ACCOUNT_INVALID.
         currency="XTR",
         prices=[LabeledPrice(label=plan["name"], amount=stars_amount)],
         protect_content=False,
@@ -80,7 +82,8 @@ async def send_star_package_invoice(bot, chat_id: int, pkg_id: str, user_id: int
         title=f"{pkg['name']}  ·  {pkg['stars_credited']} ⭐{bonus_text}",
         description=description,
         payload=payload,
-        provider_token="",
+        # NOTE: provider_token must be completely OMITTED for Telegram Stars (XTR).
+        # Passing provider_token="" triggers PROVIDER_ACCOUNT_INVALID.
         currency="XTR",
         prices=[LabeledPrice(label=f"{pkg['stars_paid']} Stars", amount=pkg["stars_paid"])],
         protect_content=False,

@@ -47,34 +47,19 @@ async def start_cashier(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_crypto = len(parts) > 1 and parts[1] == "crypto"
     log_interaction(target_user_id, "cashier_opened")
 
-    # Telegram's minimum Stars purchase from their store is ~$180.
-    # The Starter package (~$80) cannot realistically be paid with Stars — flag it.
-    STARS_MINIMUM_USD = 180
-
     keyboard = []
     for pkg_id, pkg in STAR_PACKAGES.items():
         bonus_text = f" (+{pkg['bonus']} bonus)" if pkg['bonus'] > 0 else ""
         crypto_price = pkg.get("crypto_usd", pkg["usd"])
 
-        # Parse the USD value as a number for comparison
-        try:
-            pkg_usd_value = int(pkg["usd"].replace("$", "").replace(",", ""))
-        except (ValueError, AttributeError):
-            pkg_usd_value = 999
-
         if is_crypto:
-            # Crypto path: show USDT price first (discounted), stars_paid in ()
+            # Crypto path: show USDT discounted price first, Stars in ()
             label = f"{pkg['name']}: {crypto_price} USDT ({pkg['stars_paid']} ⭐){bonus_text}"
             callback_data = f"buy_crypto_{pkg_id}_{target_user_id}"
         else:
-            # Stars path: show Stars amount + real USD value (NOT USDT crypto price)
-            if pkg_usd_value < STARS_MINIMUM_USD:
-                # Package below TG's Stars minimum — mark unavailable, redirect to crypto
-                label = f"⚠️ {pkg['name']}: {pkg['stars_paid']} ⭐ (~{pkg['usd']}) — Use Crypto"
-                callback_data = f"stars_unavailable_{pkg_id}_{target_user_id}"
-            else:
-                label = f"{pkg['name']}: {pkg['stars_paid']} ⭐ (~{pkg['usd']}){bonus_text}"
-                callback_data = f"buy_stars_{pkg_id}_{target_user_id}"
+            # Stars path: show Stars amount + real USD price (NOT USDT crypto price)
+            label = f"{pkg['name']}: {pkg['stars_paid']} ⭐ (~{pkg['usd']}){bonus_text}"
+            callback_data = f"buy_stars_{pkg_id}_{target_user_id}"
 
         keyboard.append([InlineKeyboardButton(label, callback_data=callback_data)])
 
@@ -98,8 +83,6 @@ async def start_cashier(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"━━━━━━━━━━━━━━━━━━━━\n\n"
             f"Pay with your Telegram Stars balance at the standard price.\n\n"
             f"Bigger pack = more bonus ⭐ free!\n\n"
-            f"⚠️ <b>Note:</b> Telegram's minimum Stars purchase is ~$180.\n"
-            f"Packages below $180 are marked — switch to Crypto for those.\n\n"
             f"💡 <b>Tip:</b> Pay with Crypto (USDT) and save <b>30% OFF</b> instantly!\n\n"
             f"<i>Choose a package below:</i>"
         )
@@ -110,40 +93,6 @@ async def handle_cashier_callback(update: Update, context: ContextTypes.DEFAULT_
     """Handles the package selection in the cashier bot."""
     query = update.callback_query
     data = query.data
-
-    # ── Stars-unavailable package tapped ───────────────────────────────────────
-    if data.startswith("stars_unavailable_"):
-        parts = data.split("_")
-        # format: stars_unavailable_{pkg_id}_{user_id}
-        if len(parts) >= 4:
-            pkg_id = parts[2]
-            target_user_id = parts[3]
-            pkg = STAR_PACKAGES.get(pkg_id)
-            pkg_name = pkg["name"] if pkg else "This package"
-            crypto_url = f"https://t.me/{CASHIER_BOT_USERNAME}?start=pay_{target_user_id}_crypto"
-            # Show popup alert
-            await query.answer(
-                f"⚠️ {pkg_name} is below Telegram's $180 Stars minimum.\n\n"
-                f"Tap the button below to switch to Crypto and save 30%!",
-                show_alert=True
-            )
-            # Send a follow-up message with a real clickable button
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=(
-                    f"⚠️ <b>{pkg_name}</b> cannot be purchased with Telegram Stars.\n\n"
-                    f"Telegram requires a minimum of ~$180 to buy Stars from their store. "
-                    f"This package is only <b>{pkg['usd']}</b>.\n\n"
-                    f"💡 <b>Use Crypto instead and save 30% instantly!</b>"
-                ),
-                reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🪙 Switch to Crypto — Save 30%", url=crypto_url)
-                ]]),
-                parse_mode="HTML"
-            )
-        else:
-            await query.answer("⚠️ This package is not available via Telegram Stars. Please use Crypto instead.", show_alert=True)
-        return
 
     if data.startswith("buy_stars_"):
         parts = data.split("_")
