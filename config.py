@@ -88,7 +88,7 @@ STAR_PACKAGES = {
         "stars_credited":  7000,    # +850 bonus
         "bonus":           850,
         "usd":             "$80",
-        "crypto_usd":      "$56",   # $80 - 30%
+        "crypto_usd":      "$80",   # Full price
     },
     "pro": {
         "name":            "🥈 Pro",
@@ -96,7 +96,7 @@ STAR_PACKAGES = {
         "stars_credited":  14000,   # +1680 bonus
         "bonus":           1680,
         "usd":             "$160",
-        "crypto_usd":      "$112",  # $160 - 30%
+        "crypto_usd":      "$160",  # Full price
     },
     "premium": {
         "name":            "🥇 Premium",
@@ -104,7 +104,7 @@ STAR_PACKAGES = {
         "stars_credited":  32000,   # +5050 bonus
         "bonus":           5050,
         "usd":             "$350",
-        "crypto_usd":      "$245",  # $350 - 30%
+        "crypto_usd":      "$350",  # Full price
     },
     "elite": {
         "name":            "💎 Elite",
@@ -112,6 +112,6 @@ STAR_PACKAGES = {
         "stars_credited":  58000,   # +11850 bonus
         "bonus":           11850,
         "usd":             "$599",
-        "crypto_usd":      "$419",  # $599 - 30%
+        "crypto_usd":      "$599",  # Full price
     },
 }

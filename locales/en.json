@@ -26,7 +26,7 @@
   "already_own_plan": "You already own {plan_name}! If you need your access link again, please contact support.",
   "upgrade_from": "\nUpgrading from {cur_name}\n",
   "currently_have": "\nYou currently have {cur_name}\n",
-  "plan_details": "🛒 <b>{plan_name}</b>\n━━━━━━━━━━━━━━━━━━━━\n📦 {description}\n\n{urgency_text}💰 <b>Crypto Price:</b> <s>${original_price}</s> ${price} USDT\n⭐ <b>Stars Price:</b> {stars_price} Stars\n{upgrade_note}\nChoose your preferred payment method below:",
+  "plan_details": "🛒 <b>{plan_name}</b>\n━━━━━━━━━━━━━━━━━━━━\n📦 {description}\n\n{urgency_text}💰 <b>Price:</b> <s>${original_price}</s> ${price} USDT\n{upgrade_note}\nTap the button below to pay with Crypto (USDT):",
   
   "urgency_text": "⚠️ <i>Only {spots_left} spots left at this price!</i>\n\n",
   "social_proof_text": "🔥 <i>{buyers_count} people bought a plan in the last 24 hours</i>\n\n",

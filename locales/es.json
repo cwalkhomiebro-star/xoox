@@ -26,7 +26,7 @@
   "already_own_plan": "¡Ya tienes {plan_name}! Si necesitas tu enlace de acceso de nuevo, por favor contacta a soporte.",
   "upgrade_from": "\nMejorando de {cur_name}\n",
   "currently_have": "\nActualmente tienes {cur_name}\n",
-  "plan_details": "🛒 <b>{plan_name}</b>\n━━━━━━━━━━━━━━━━━━━━\n📦 {description}\n\n💰 <b>Precio en Cripto:</b> ${price} USDT\n⭐ <b>Precio en Stars:</b> {stars_price} Stars\n{upgrade_note}\nElige tu método de pago preferido abajo:",
+  "plan_details": "🛒 <b>{plan_name}</b>\n━━━━━━━━━━━━━━━━━━━━\n📦 {description}\n\n💰 <b>Precio:</b> ${price} USDT\n{upgrade_note}\nPresiona el botón de abajo para pagar con Cripto (USDT):",
   
   "choose_language": "🌍 <b>Selecciona tu idioma / Select your language</b>\n━━━━━━━━━━━━━━━━━━━━\n\nPor favor, elige tu idioma preferido abajo:",
 

@@ -129,7 +129,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         keyboard = [
             [InlineKeyboardButton(get_text("btn_pay_crypto", lang), callback_data=f"pay_crypto_{deep_plan}")],
-            [InlineKeyboardButton(get_text("btn_pay_stars", lang), callback_data=f"pay_stars_{deep_plan}")],
             [get_buy_stars_button(lang, user.id, text=get_text("btn_back_plans", lang))],
         ]
         

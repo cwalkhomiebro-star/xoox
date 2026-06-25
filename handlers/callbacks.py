@@ -39,7 +39,6 @@ from services.user_service import (
     deduct_stars,
 )
 from services.payment_service import get_payment_instructions
-from services.stars_service import send_stars_invoice, send_star_package_invoice
 from services.demo_service import get_all_demo_videos, get_demo_video
 
 logger = logging.getLogger(__name__)
@@ -162,7 +161,7 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
             )
 
     # ── Buy Stars (Redirect to Cashier) ────────────────────
-    elif data == "view_pricing":
+    elif data in ("view_pricing", "buy_crypto_stars"):
         log_interaction(user_id, "view_pricing")
         from config import CASHIER_BOT_USERNAME
         
@@ -173,51 +172,20 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
         cashier_link = f"https://t.me/{CASHIER_BOT_USERNAME}?start=pay_{user_id}"
         
         keyboard = [
-            [InlineKeyboardButton("💫 Open Secure Top-Up Portal", url=cashier_link)],
-            [InlineKeyboardButton(get_text("btn_main_menu", lang), callback_data="main_menu")]
-        ]
-
-        text = (
-            f"💫 <b>Buy Stars</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"For security and to ensure your balance is never lost, all payments are handled by our dedicated Cashier bot.\n\n"
-            f"Tap the button below to top up your account securely. Your balance will update here instantly!"
-        )
-        try:
-            await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
-        except Exception:
-            await context.bot.send_message(chat_id=user_id, text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
-
-
-
-    # ── Buy Stars with Crypto ──────────────────────────────
-    elif data == "buy_crypto_stars":
-        log_interaction(user_id, "view_pricing")
-        from config import CASHIER_BOT_USERNAME
-
-        if CASHIER_BOT_USERNAME == "YourCashierBotUsername":
-            await query.answer("❌ Cashier bot not configured.", show_alert=True)
-            return
-
-        cashier_link = f"https://t.me/{CASHIER_BOT_USERNAME}?start=pay_{user_id}_crypto"
-
-        keyboard = [
             [InlineKeyboardButton("🪙 Open Secure Top-Up Portal", url=cashier_link)],
             [InlineKeyboardButton(get_text("btn_main_menu", lang), callback_data="main_menu")]
         ]
 
         text = (
-            f"🪙 <b>Buy Stars with Crypto</b>\n"
+            f"🪙 <b>Buy Stars</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"🔥 <b>Crypto Exclusive: 30% OFF all packages!</b>\n"
-            f"Pay with USDT (TRC20) through our secure cashier and save instantly.\n\n"
-            f"Tap the button below — all packages and prices are shown there."
+            f"For security and to ensure your balance is never lost, all payments are handled by our dedicated Cashier bot.\n\n"
+            f"Payments are made via <b>USDT (TRC20)</b>. Tap the button below to top up your account securely. Your balance will update here instantly!"
         )
         try:
             await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
         except Exception:
             await context.bot.send_message(chat_id=user_id, text=text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
-
 
 
     elif data.startswith("buy_cryptopkg_"):
@@ -240,7 +208,7 @@ async def _handle_callback_inner(update: Update, context: ContextTypes.DEFAULT_T
             f"🪙 <b>Crypto Payment (USDT TRC20)</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━\n\n"
             f"💎 <b>Package:</b> {pkg['name']} ({pkg['stars_credited']} ⭐)\n"
-            f"💵 <b>Amount to Send:</b> ${usd_amount} USDT  <s>{pkg['usd']}</s>  <b>(-30% crypto deal!)</b>\n\n"
+            f"💵 <b>Amount to Send:</b> ${usd_amount} USDT\n\n"
             f"🏦 <b>Wallet Address (TRC20):</b>\n"
             f"<code>{WALLET_ADDRESS}</code>\n\n"
             f"⚠️ <b>Important:</b>\n"
