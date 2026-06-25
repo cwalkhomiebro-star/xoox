@@ -84,33 +84,33 @@ DAILY_STARS = 5             # configurable daily bonus
 STAR_PACKAGES = {
     "starter": {
         "name":            "🥉 Starter",
-        "stars_paid":      6150,    # ~$80
-        "stars_credited":  7000,    # +850 bonus
-        "bonus":           850,
+        "stars_paid":      2050,    # 1/3 of original
+        "stars_credited":  2330,    # 1/3 of original
+        "bonus":           280,     # 1/3 of original
         "usd":             "$80",
         "crypto_usd":      "$80",   # Full price
     },
     "pro": {
         "name":            "🥈 Pro",
-        "stars_paid":      12320,   # ~$160
-        "stars_credited":  14000,   # +1680 bonus
-        "bonus":           1680,
+        "stars_paid":      4100,    # 1/3 of original
+        "stars_credited":  4660,    # 1/3 of original
+        "bonus":           560,     # 1/3 of original
         "usd":             "$160",
         "crypto_usd":      "$160",  # Full price
     },
     "premium": {
         "name":            "🥇 Premium",
-        "stars_paid":      26950,   # ~$350
-        "stars_credited":  32000,   # +5050 bonus
-        "bonus":           5050,
+        "stars_paid":      8980,    # 1/3 of original
+        "stars_credited":  10660,   # 1/3 of original
+        "bonus":           1680,    # 1/3 of original
         "usd":             "$350",
         "crypto_usd":      "$350",  # Full price
     },
     "elite": {
         "name":            "💎 Elite",
-        "stars_paid":      46150,   # ~$599
-        "stars_credited":  58000,   # +11850 bonus
-        "bonus":           11850,
+        "stars_paid":      15380,   # 1/3 of original
+        "stars_credited":  19330,   # 1/3 of original
+        "bonus":           3950,    # 1/3 of original
         "usd":             "$599",
         "crypto_usd":      "$599",  # Full price
     },
