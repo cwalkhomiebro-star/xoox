@@ -90,7 +90,7 @@ async def handle_cashier_callback(update: Update, context: ContextTypes.DEFAULT_
 
     if data.startswith("buy_stars_"):
         parts = data.split("_")
-        if len(parts) != 5:
+        if len(parts) != 4:
             await query.answer("❌ Invalid package data.", show_alert=True)
             return
 
@@ -126,7 +126,7 @@ async def handle_cashier_callback(update: Update, context: ContextTypes.DEFAULT_
 
     elif data.startswith("buy_crypto_"):
         parts = data.split("_")
-        if len(parts) != 5:
+        if len(parts) != 4:
             await query.answer("❌ Invalid package data.", show_alert=True)
             return
 
