@@ -53,11 +53,11 @@ async def start_cashier(update: Update, context: ContextTypes.DEFAULT_TYPE):
         crypto_price = pkg.get("crypto_usd", pkg["usd"])
 
         if is_crypto:
-            # Crypto path: show USDT discounted price first, Stars in ()
-            label = f"{pkg['name']}: {crypto_price} USDT ({pkg['stars_paid']} ⭐){bonus_text}"
+            # Crypto path: show USDT discounted price first
+            label = f"{pkg['name']}: {crypto_price} USDT ({pkg['stars_credited']} ⭐){bonus_text}"
             callback_data = f"buy_crypto_{pkg_id}_{target_user_id}"
         else:
-            # Stars path: show Stars amount + real USD price (NOT USDT crypto price)
+            # Stars path: show Stars cost + real USD price
             label = f"{pkg['name']}: {pkg['stars_paid']} ⭐ (~{pkg['usd']}){bonus_text}"
             callback_data = f"buy_stars_{pkg_id}_{target_user_id}"
 
@@ -81,7 +81,7 @@ async def start_cashier(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = (
             f"💫 <b>Secure Star Top-Up</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"Pay with your Telegram Stars balance at the standard price.\n\n"
+            f"Pay with your Telegram Stars balance.\n\n"
             f"Bigger pack = more bonus ⭐ free!\n\n"
             f"💡 <b>Tip:</b> Pay with Crypto (USDT) and save <b>30% OFF</b> instantly!\n\n"
             f"<i>Choose a package below:</i>"
@@ -89,10 +89,13 @@ async def start_cashier(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
 
 
+
 async def handle_cashier_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles the package selection in the cashier bot."""
     query = update.callback_query
     data = query.data
+
+
 
     if data.startswith("buy_stars_"):
         parts = data.split("_")
